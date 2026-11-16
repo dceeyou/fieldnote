@@ -30,7 +30,17 @@ import { getAllLandsWithCrops, type LandWithCrops } from '../services/landServic
 import { getAllCrops } from '../services/cropService.ts'
 import { getAllFertilizers } from '../services/fertilizerService.ts'
 import type { FertilizerApplication, Crop, Fertilizer } from '../data/db/schema.ts'
-import { getTodayColombo, addDays, formatDateDisplay } from '../utils/date.ts'
+import {
+  getTodayColombo,
+  addDays,
+  formatDateDisplay,
+  formatDateDDMMYYYY,
+  calculateDueDateFromInterval,
+  inferReminderInterval,
+  getReminderIntervalLabel,
+  REMINDER_INTERVAL_OPTIONS,
+  type ReminderInterval,
+} from '../utils/date.ts'
 import { getFertilizerDueStatus } from '../utils/reminders.ts'
 import { formatLKR } from '../utils/calculations.ts'
 
@@ -63,6 +73,7 @@ export function FertilizerTracker() {
   const [cropId, setCropId] = useState('')
   const [fertilizerId, setFertilizerId] = useState('')
   const [applicationDate, setApplicationDate] = useState(getTodayColombo())
+  const [reminderInterval, setReminderInterval] = useState<ReminderInterval>('1_month')
   const [quantity, setQuantity] = useState('')
   const [unit, setUnit] = useState('kg')
   const [cost, setCost] = useState('')
@@ -168,20 +179,42 @@ export function FertilizerTracker() {
     return crops.filter((c) => c.isActive && selectedLand.cropIds.includes(c.id))
   }, [landId, lands, crops])
 
+  function handleApplicationDateChange(newDate: string) {
+    setApplicationDate(newDate)
+    if (reminderInterval !== 'custom' && newDate) {
+      const calculated = calculateDueDateFromInterval(newDate, reminderInterval)
+      if (calculated) {
+        setNextDueDate(calculated)
+      }
+    }
+  }
+
+  function handleIntervalChange(newInterval: ReminderInterval) {
+    setReminderInterval(newInterval)
+    if (newInterval !== 'custom') {
+      const calculated = calculateDueDateFromInterval(applicationDate, newInterval)
+      if (calculated) {
+        setNextDueDate(calculated)
+      }
+    }
+  }
+
   function openAddModal() {
     setEditingApp(null)
     const firstLand = lands.find((l) => l.isActive)
     const firstCrop = crops.find((c) => c.isActive)
     const firstFert = fertilizers.find((f) => f.isActive)
 
+    const todayStr = getTodayColombo()
     setLandId(firstLand?.id || '')
     setCropId(firstCrop?.id || '')
     setFertilizerId(firstFert?.id || '')
-    setApplicationDate(getTodayColombo())
+    setApplicationDate(todayStr)
+    setReminderInterval('1_month')
     setQuantity('')
     setUnit(firstFert?.defaultUnit || 'kg')
     setCost('')
-    setNextDueDate(addDays(getTodayColombo(), 30))
+    setNextDueDate(calculateDueDateFromInterval(todayStr, '1_month') || '')
     setNotes('')
     setFormError(null)
     setIsAddModalOpen(true)
@@ -196,6 +229,13 @@ export function FertilizerTracker() {
     setQuantity(app.quantity !== undefined ? String(app.quantity) : '')
     setUnit(app.unit || 'kg')
     setCost(app.cost !== undefined ? String(app.cost) : '')
+
+    const resolvedInterval = inferReminderInterval(
+      app.applicationDate,
+      app.nextDueDate,
+      app.reminderInterval
+    )
+    setReminderInterval(resolvedInterval)
     setNextDueDate(app.nextDueDate || '')
     setNotes(app.notes || '')
     setFormError(null)
@@ -205,8 +245,12 @@ export function FertilizerTracker() {
   function openCompleteModal(app: FertilizerApplication) {
     setCompletingApp(app)
     setCompletedDate(getTodayColombo())
-    // Default next schedule to +30 days
-    setNextScheduleDate(addDays(getTodayColombo(), 30))
+    const interval = (app.reminderInterval as ReminderInterval) || '1_month'
+    const nextDate =
+      interval !== 'custom'
+        ? calculateDueDateFromInterval(getTodayColombo(), interval)
+        : addDays(getTodayColombo(), 30)
+    setNextScheduleDate(nextDate || addDays(getTodayColombo(), 30))
     setIsCompleteModalOpen(true)
   }
 
@@ -223,6 +267,16 @@ export function FertilizerTracker() {
     }
     if (!fertilizerId) {
       setFormError('Fertilizer product selection is required.')
+      return
+    }
+
+    if (reminderInterval === 'custom' && !nextDueDate) {
+      setFormError('Please select a valid Next Due Date.')
+      return
+    }
+
+    if (nextDueDate && applicationDate && nextDueDate < applicationDate) {
+      setFormError('Next due date cannot be earlier than application date.')
       return
     }
 
@@ -251,6 +305,7 @@ export function FertilizerTracker() {
           quantity: parsedQty,
           unit: unit.trim() || undefined,
           cost: parsedCost,
+          reminderInterval,
           nextDueDate: nextDueDate || undefined,
           status: editingApp ? editingApp.status : 'scheduled',
           notes: notes.trim() || undefined,
@@ -277,7 +332,8 @@ export function FertilizerTracker() {
     await markApplicationCompleted(
       completingApp.id,
       completedDate,
-      nextScheduleDate || undefined
+      nextScheduleDate || undefined,
+      completingApp.reminderInterval
     )
     setIsCompleteModalOpen(false)
     await loadApplications()
@@ -545,6 +601,11 @@ export function FertilizerTracker() {
                       {app.nextDueDate && (
                         <span>
                           Next Due: <strong>{formatDateDisplay(app.nextDueDate)}</strong>
+                          {app.reminderInterval && (
+                            <span className="ml-1 text-muted">
+                              ({getReminderIntervalLabel(app.reminderInterval)})
+                            </span>
+                          )}
                         </span>
                       )}
                       {app.quantity && (
@@ -686,22 +747,63 @@ export function FertilizerTracker() {
               ))}
           </Select>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="Application Date"
               type="date"
               value={applicationDate}
-              onChange={(e) => setApplicationDate(e.target.value)}
+              onChange={(e) => handleApplicationDateChange(e.target.value)}
               required
             />
-            <Input
-              label="Next Due Date (For Reminder)"
-              type="date"
-              value={nextDueDate}
-              onChange={(e) => setNextDueDate(e.target.value)}
-              helperText="Generates in-app dashboard reminders"
-            />
+            <Select
+              label="Reminder Interval"
+              value={reminderInterval}
+              onChange={(e) => handleIntervalChange(e.target.value as ReminderInterval)}
+              required
+            >
+              {REMINDER_INTERVAL_OPTIONS.map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </Select>
           </div>
+
+          {reminderInterval === 'custom' ? (
+            <div className="space-y-1">
+              <Input
+                label="Next Due Date"
+                type="date"
+                min={applicationDate}
+                value={nextDueDate}
+                onChange={(e) => setNextDueDate(e.target.value)}
+                helperText={
+                  nextDueDate
+                    ? `Formatted: ${formatDateDDMMYYYY(nextDueDate)}`
+                    : 'Select custom due date'
+                }
+                required
+              />
+            </div>
+          ) : (
+            <div className="rounded-lg border border-border bg-subtle/50 p-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-xs font-medium text-muted">Calculated Next Due Date</p>
+                  <p className="mt-0.5 text-base font-semibold text-text">
+                    {nextDueDate ? formatDateDDMMYYYY(nextDueDate) : '—'}
+                  </p>
+                </div>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-forest-50 px-2.5 py-1 text-xs font-medium text-forest-700 dark:bg-forest-900/30 dark:text-forest-200">
+                  <Calendar size={13} />
+                  {getReminderIntervalLabel(reminderInterval)}
+                </span>
+              </div>
+              <p className="mt-1.5 text-xs text-muted">
+                Next application date is calculated automatically.
+              </p>
+            </div>
+          )}
 
           <div className="grid grid-cols-3 gap-3">
             <Input

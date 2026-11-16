@@ -60,6 +60,7 @@ export async function saveFertilizerApplication(
     quantity: validated.quantity ?? undefined,
     unit: validated.unit || undefined,
     cost: validated.cost ?? undefined,
+    reminderInterval: validated.reminderInterval || undefined,
     nextDueDate: validated.nextDueDate || undefined,
     status: validated.status || 'scheduled',
     actualCompletedDate: validated.actualCompletedDate || undefined,
@@ -84,7 +85,8 @@ export async function saveFertilizerApplication(
 export async function markApplicationCompleted(
   id: string,
   actualCompletedDate: string,
-  nextDueDate?: string
+  nextDueDate?: string,
+  reminderInterval?: string
 ): Promise<void> {
   const existing = await db.fertilizerApplications.get(id)
   if (!existing) return
@@ -110,6 +112,7 @@ export async function markApplicationCompleted(
         quantity: existing.quantity,
         unit: existing.unit,
         cost: existing.cost,
+        reminderInterval: reminderInterval ?? existing.reminderInterval,
         nextDueDate,
         status: 'scheduled',
         notes: existing.notes ? `Follow-up from previous application: ${existing.notes}` : undefined,

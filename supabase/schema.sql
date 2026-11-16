@@ -89,6 +89,7 @@ create table if not exists public.fertilizer_applications (
   quantity numeric,
   unit text,
   cost numeric,
+  reminder_interval text,
   next_due_date text,
   status text default 'scheduled' not null check (status in ('scheduled', 'completed', 'cancelled')),
   actual_completed_date text,
@@ -96,6 +97,9 @@ create table if not exists public.fertilizer_applications (
   created_at timestamptz default now() not null,
   updated_at timestamptz default now() not null
 );
+
+-- Backward-compatible migration if column does not yet exist
+alter table if exists public.fertilizer_applications add column if not exists reminder_interval text;
 
 -- Enable Row Level Security (RLS) on all tables
 alter table public.lands enable row level security;

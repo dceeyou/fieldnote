@@ -5,6 +5,20 @@ export interface LandCrop extends Timestamped { id: string; landId: string; crop
 export interface Category extends Timestamped { id: string; name: string; type: 'income' | 'expense'; description?: string; isActive: boolean; sortOrder: number }
 export interface Transaction extends Timestamped { id: string; date: string; type: 'income' | 'expense'; landId: string; cropId?: string; categoryId: string; description: string; amount: number; paymentMethod?: string; referenceNumber?: string; notes?: string; source: 'manual' | 'import'; importBatchId?: string }
 export interface Fertilizer extends Timestamped { id: string; name: string; type?: string; defaultUnit?: string; notes?: string; isActive: boolean }
-export interface FertilizerApplication extends Timestamped { id: string; landId: string; cropId: string; fertilizerId: string; applicationDate: string; quantity?: number; unit?: string; cost?: number; nextDueDate?: string; status: 'scheduled' | 'completed' | 'cancelled'; actualCompletedDate?: string; notes?: string }
+export interface FertilizerApplication extends Timestamped {
+  id: string
+  landId: string
+  cropId: string
+  fertilizerId: string
+  applicationDate: string
+  quantity?: number
+  unit?: string
+  cost?: number
+  reminderInterval?: string
+  nextDueDate?: string
+  status: 'scheduled' | 'completed' | 'cancelled'
+  actualCompletedDate?: string
+  notes?: string
+}
 export interface ImportBatch { id: string; fileName: string; fileType: string; importedAt: string; totalRows: number; importedRows: number; skippedRows: number; status: string; notes?: string }
 export interface Setting { key: string; value: unknown }

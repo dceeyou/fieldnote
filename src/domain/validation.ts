@@ -70,6 +70,7 @@ export const fertilizerApplicationInputSchema = z.object({
   quantity: z.number().positive().optional().nullable(),
   unit: z.string().trim().optional(),
   cost: z.number().nonnegative().optional().nullable(),
+  reminderInterval: z.string().optional(),
   nextDueDate: dateStringSchema.optional().nullable(),
   status: z.enum(['scheduled', 'completed', 'cancelled']).default('scheduled'),
   actualCompletedDate: dateStringSchema.optional().nullable(),
