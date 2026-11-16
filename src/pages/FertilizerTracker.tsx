@@ -19,6 +19,7 @@ import { Card } from '../components/ui/Card.tsx'
 import { Modal } from '../components/ui/Modal.tsx'
 import { Input } from '../components/ui/Input.tsx'
 import { Select } from '../components/ui/Select.tsx'
+import { DatePicker } from '../components/ui/date-picker.tsx'
 import { ExportModal } from '../components/export/ExportModal.tsx'
 import { FertilizerProductCatalog } from '../components/fertilizer/FertilizerProductCatalog.tsx'
 import {
@@ -756,11 +757,10 @@ export function FertilizerTracker() {
           </Select>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <Input
+            <DatePicker
               label="Application Date"
-              type="date"
               value={applicationDate}
-              onChange={(e) => handleApplicationDateChange(e.target.value)}
+              onChange={(val) => handleApplicationDateChange(val)}
               required
             />
             <Select
@@ -779,17 +779,12 @@ export function FertilizerTracker() {
 
           {reminderInterval === 'custom' ? (
             <div className="space-y-1">
-              <Input
+              <DatePicker
                 label="Next Due Date"
-                type="date"
-                min={applicationDate}
+                minDate={applicationDate}
                 value={nextDueDate}
-                onChange={(e) => setNextDueDate(e.target.value)}
-                helperText={
-                  nextDueDate
-                    ? `Formatted: ${formatDateDDMMYYYY(nextDueDate)}`
-                    : 'Select custom due date'
-                }
+                onChange={(val) => setNextDueDate(val)}
+                helperText="Select custom due date"
                 required
               />
             </div>
@@ -873,22 +868,22 @@ export function FertilizerTracker() {
         description="Record the completion of this application and optionally schedule the next cycle."
       >
         <form onSubmit={handleConfirmComplete} className="space-y-4">
-          <Input
+          <DatePicker
             label="Actual Date Completed"
-            type="date"
             value={completedDate}
-            onChange={(e) => setCompletedDate(e.target.value)}
+            onChange={(val) => setCompletedDate(val)}
             required
             autoFocus
           />
 
           <div className="space-y-2">
-            <Input
+            <DatePicker
               label="Schedule Next Application (Optional)"
-              type="date"
               value={nextScheduleDate}
-              onChange={(e) => setNextScheduleDate(e.target.value)}
+              onChange={(val) => setNextScheduleDate(val)}
               helperText="Automatically creates the next scheduled application record"
+              minDate={completedDate}
+              clearable
             />
 
             <div className="flex flex-wrap gap-2 pt-1">

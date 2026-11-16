@@ -22,6 +22,7 @@ import { Card } from '../components/ui/Card.tsx'
 import { Modal } from '../components/ui/Modal.tsx'
 import { Input } from '../components/ui/Input.tsx'
 import { Select } from '../components/ui/Select.tsx'
+import { DatePicker } from '../components/ui/date-picker.tsx'
 import { ExportModal } from '../components/export/ExportModal.tsx'
 import {
   getTransactions,
@@ -698,21 +699,23 @@ export function Transactions() {
           </div>
 
           {datePreset === 'custom' && (
-            <div className="flex items-center gap-2">
-              <span className="text-muted">From:</span>
-              <input
-                type="date"
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="rounded-lg border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-forest-500"
-              />
-              <span className="text-muted">To:</span>
-              <input
-                type="date"
-                value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
-                className="rounded-lg border border-border bg-surface px-2 py-1 text-xs text-text focus:outline-none focus:ring-1 focus:ring-forest-500"
-              />
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="w-36">
+                <DatePicker
+                  value={startDate}
+                  onChange={(val) => setStartDate(val)}
+                  placeholder="From date"
+                />
+              </div>
+              <span className="text-muted text-xs">to</span>
+              <div className="w-36">
+                <DatePicker
+                  value={endDate}
+                  onChange={(val) => setEndDate(val)}
+                  placeholder="To date"
+                  minDate={startDate}
+                />
+              </div>
             </div>
           )}
         </div>
@@ -944,11 +947,10 @@ export function Transactions() {
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <Input
+            <DatePicker
               label="Transaction Date"
-              type="date"
               value={txDate}
-              onChange={(e) => setTxDate(e.target.value)}
+              onChange={(val) => setTxDate(val)}
               required
             />
             <Input

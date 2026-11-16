@@ -9,6 +9,7 @@ import {
   Sprout,
 } from 'lucide-react'
 import { Button } from '../components/ui/Button.tsx'
+import { DatePicker } from '../components/ui/date-picker.tsx'
 import { WeatherWidget } from '../components/dashboard/WeatherWidget.tsx'
 import { FinancialSummaryCards } from '../components/dashboard/FinancialSummaryCard.tsx'
 import { IncomeExpenseBarChart } from '../components/dashboard/IncomeExpenseBarChart.tsx'
@@ -170,26 +171,19 @@ export function Dashboard() {
             {/* Custom Dates Inputs (visible when custom preset chosen) */}
             {datePreset === 'custom' && (
               <div className="lg:col-span-3 flex items-center gap-2">
-                <div className="space-y-1 flex-1">
-                  <label className="block text-[11px] font-medium text-muted">
-                    From
-                  </label>
-                  <input
-                    type="date"
+                <div className="flex-1">
+                  <DatePicker
+                    label="From"
                     value={startDate}
-                    onChange={(e) => setStartDate(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-canvas px-2.5 py-1.5 text-xs text-text focus:outline-none focus:ring-1 focus:ring-forest-500"
+                    onChange={(val) => setStartDate(val)}
                   />
                 </div>
-                <div className="space-y-1 flex-1">
-                  <label className="block text-[11px] font-medium text-muted">
-                    To
-                  </label>
-                  <input
-                    type="date"
+                <div className="flex-1">
+                  <DatePicker
+                    label="To"
                     value={endDate}
-                    onChange={(e) => setEndDate(e.target.value)}
-                    className="w-full rounded-lg border border-border bg-canvas px-2.5 py-1.5 text-xs text-text focus:outline-none focus:ring-1 focus:ring-forest-500"
+                    onChange={(val) => setEndDate(val)}
+                    minDate={startDate}
                   />
                 </div>
               </div>

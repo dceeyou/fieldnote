@@ -12,7 +12,7 @@ import {
 import { Modal } from '../ui/Modal.tsx'
 import { Button } from '../ui/Button.tsx'
 import { Select } from '../ui/Select.tsx'
-import { Input } from '../ui/Input.tsx'
+import { DatePicker } from '../ui/date-picker.tsx'
 import {
   type ExportDataType,
   type ExportDatePreset,
@@ -253,18 +253,17 @@ export function ExportModal({ isOpen, onClose, initialDataType = 'all' }: Export
 
           {datePreset === 'custom' ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-              <Input
+              <DatePicker
                 label="From Date"
-                type="date"
                 value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
+                onChange={(val) => setStartDate(val)}
                 required
               />
-              <Input
+              <DatePicker
                 label="To Date"
-                type="date"
                 value={endDate}
-                onChange={(e) => setEndDate(e.target.value)}
+                onChange={(val) => setEndDate(val)}
+                minDate={startDate}
                 required
               />
             </div>
