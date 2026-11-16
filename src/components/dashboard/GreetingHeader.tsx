@@ -73,33 +73,8 @@ export function GreetingHeader({ className = '', initialDate }: GreetingHeaderPr
   return (
     <section
       aria-label="Dashboard Greeting & Sri Lanka Standard Time"
-      className={`relative overflow-hidden rounded-2xl bg-gradient-to-br from-forest-800 via-forest-700 to-forest-900 p-5 sm:p-6 lg:p-7 text-white shadow-md border border-forest-600/30 transition-colors ${className}`}
+      className={`relative overflow-hidden rounded-2xl bg-gradient-to-br from-forest-700 via-forest-600 to-forest-800 p-5 sm:p-6 lg:p-7 text-white shadow-md border border-forest-500/30 transition-colors ${className}`}
     >
-      {/* Decorative Subtle Agricultural Watermark */}
-      <div
-        className="pointer-events-none absolute -right-6 -bottom-8 select-none opacity-10"
-        aria-hidden="true"
-      >
-        <svg
-          width="240"
-          height="240"
-          viewBox="0 0 200 200"
-          fill="none"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <path
-            d="M100 20C100 20 120 60 160 70C200 80 180 130 150 160C120 190 70 190 40 160C10 130 0 80 40 70C80 60 100 20 100 20Z"
-            fill="currentColor"
-          />
-          <path
-            d="M100 40V160M100 70C120 85 140 85 150 90M100 100C120 115 135 120 145 130M100 75C80 90 65 92 52 98M100 110C80 125 68 132 58 140"
-            stroke="white"
-            strokeWidth="4"
-            strokeLinecap="round"
-          />
-        </svg>
-      </div>
-
       <div className="relative z-10 flex flex-col gap-5 sm:flex-row sm:items-center sm:justify-between">
         {/* Left / Primary Area: Greeting & Daily Motivational Quote */}
         <div className="space-y-2.5 max-w-xl">
@@ -112,7 +87,7 @@ export function GreetingHeader({ className = '', initialDate }: GreetingHeaderPr
             </h2>
           </div>
 
-          <div className="flex items-start gap-2 pt-0.5 text-forest-100/90 text-sm leading-relaxed">
+          <div className="flex items-start gap-2 pt-0.5 text-forest-100/95 text-sm leading-relaxed">
             <Sprout size={16} className="mt-0.5 shrink-0 text-forest-200 opacity-90" aria-hidden="true" />
             <p className="font-normal italic">
               &ldquo;{motivationalMessage}&rdquo;
@@ -121,15 +96,15 @@ export function GreetingHeader({ className = '', initialDate }: GreetingHeaderPr
         </div>
 
         {/* Right / Secondary Area: Prominent Date, Digital Clock & Sri Lanka Timezone */}
-        <div className="rounded-xl bg-black/20 backdrop-blur-xs border border-white/10 px-4 py-3 sm:px-5 sm:py-4 sm:text-right flex flex-col sm:items-end justify-center shrink-0 min-w-[240px] sm:min-w-[270px]">
+        <div className="rounded-xl bg-black/25 backdrop-blur-xs border border-white/10 px-4 py-3.5 sm:px-5 sm:py-4 flex flex-col items-start sm:items-end justify-center shrink-0 min-w-[240px] sm:min-w-[270px]">
           {/* Current Date in Asia/Colombo (13-14px medium/semibold uppercase) */}
           <p className="text-xs sm:text-[13px] font-semibold uppercase tracking-wider text-forest-200">
             {dateFormatted}
           </p>
 
           {/* Prominent Live Digital Clock (36-42px bold, tabular-nums) */}
-          <div className="mt-1 flex items-baseline gap-2">
-            <Clock size={20} className="hidden sm:inline-block text-forest-200 opacity-70" aria-hidden="true" />
+          <div className="mt-1 flex items-center gap-2">
+            <Clock size={20} className="text-forest-200 opacity-75 shrink-0" aria-hidden="true" />
             <span
               data-testid="live-digital-clock"
               className="text-3xl sm:text-4xl lg:text-[40px] font-extrabold tracking-tight text-white tabular-nums leading-none drop-shadow-xs"
@@ -139,7 +114,7 @@ export function GreetingHeader({ className = '', initialDate }: GreetingHeaderPr
           </div>
 
           {/* Sri Lanka Timezone Subtitle (11-12px) */}
-          <div className="mt-2 flex items-center gap-1.5 text-[11px] sm:text-xs text-forest-200/80 font-medium">
+          <div className="mt-2 flex items-center gap-1.5 text-[11px] sm:text-xs text-forest-200/90 font-medium">
             <span
               className="inline-block size-1.5 rounded-full bg-emerald-400 animate-pulse"
               aria-hidden="true"
