@@ -8,7 +8,16 @@ export default {
         '7': 'repeat(7, minmax(0, 1fr))',
       },
       colors: {
-        forest: { 50: '#eef5ee', 100: '#dcebdc', 500: '#477a4f', 600: '#386642', 700: '#2b5134' },
+        forest: {
+          50: '#eef5ee',
+          100: '#dcebdc',
+          200: '#c1ddc3',
+          500: '#477a4f',
+          600: '#386642',
+          700: '#2b5134',
+          800: '#1f3d27',
+          900: '#14291a',
+        },
         canvas: 'var(--canvas)',
         surface: 'var(--surface)',
         subtle: 'var(--subtle)',

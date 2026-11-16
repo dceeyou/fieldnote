@@ -10,6 +10,7 @@ import {
 } from 'lucide-react'
 import { Button } from '../components/ui/Button.tsx'
 import { DatePicker } from '../components/ui/date-picker.tsx'
+import { GreetingHeader } from '../components/dashboard/GreetingHeader.tsx'
 import { WeatherWidget } from '../components/dashboard/WeatherWidget.tsx'
 import { FinancialSummaryCards } from '../components/dashboard/FinancialSummaryCard.tsx'
 import { IncomeExpenseBarChart } from '../components/dashboard/IncomeExpenseBarChart.tsx'
@@ -26,15 +27,6 @@ import type { DatePreset } from '../domain/dashboard.ts'
 
 export function Dashboard() {
   const navigate = useNavigate()
-
-  // Header Date display (Asia/Colombo)
-  const todayFormatted = new Intl.DateTimeFormat('en-US', {
-    weekday: 'long',
-    month: 'long',
-    day: 'numeric',
-    year: 'numeric',
-    timeZone: 'Asia/Colombo',
-  }).format(new Date())
 
   // Dashboard Filters State
   const {
@@ -63,16 +55,18 @@ export function Dashboard() {
   return (
     <div className="mx-auto max-w-7xl py-6 sm:py-8 space-y-8">
       {/* =========================================================================
+          SECTION 0: PERSONALIZED GREETING HEADER WITH LIVE DATE & TIME
+         ========================================================================= */}
+      <GreetingHeader />
+
+      {/* =========================================================================
           SECTION A: DASHBOARD HEADER & GLOBAL FILTERS
          ========================================================================= */}
       <div className="space-y-6">
         {/* Header Title & Action Buttons */}
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-xs font-medium uppercase tracking-wider text-muted">
-              {todayFormatted}
-            </p>
-            <h1 className="mt-1 text-3xl font-bold tracking-tight text-text">
+            <h1 className="text-3xl font-bold tracking-tight text-text">
               Farm Overview
             </h1>
             <p className="mt-1.5 text-sm text-muted max-w-2xl">
