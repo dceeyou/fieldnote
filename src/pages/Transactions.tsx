@@ -15,12 +15,14 @@ import {
   AlertTriangle,
   CheckCircle2,
   FileSpreadsheet,
+  Download,
 } from 'lucide-react'
 import { Button } from '../components/ui/Button.tsx'
 import { Card } from '../components/ui/Card.tsx'
 import { Modal } from '../components/ui/Modal.tsx'
 import { Input } from '../components/ui/Input.tsx'
 import { Select } from '../components/ui/Select.tsx'
+import { ExportModal } from '../components/export/ExportModal.tsx'
 import {
   getTransactions,
   saveTransaction,
@@ -116,6 +118,9 @@ export function Transactions() {
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleteSuccess, setBulkDeleteSuccess] = useState<string | null>(null)
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+
+  // Export State
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false)
 
   // Quick lookup maps
   const landMap = useMemo(() => new Map(lands.map((l) => [l.id, l.name])), [lands])
@@ -518,6 +523,12 @@ export function Transactions() {
             }}
           >
             <Upload size={16} /> Import CSV
+          </Button>
+          <Button
+            variant="secondary"
+            onClick={() => setIsExportModalOpen(true)}
+          >
+            <Download size={16} /> Export
           </Button>
           <Button onClick={openAddModal}>
             <Plus size={17} /> Add transaction
@@ -1231,6 +1242,13 @@ export function Transactions() {
           </div>
         </div>
       </Modal>
+
+      {/* Export to Excel Modal */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        initialDataType="transactions"
+      />
     </div>
   )
 }

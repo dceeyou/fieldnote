@@ -7,9 +7,10 @@ interface ModalProps {
   title: string
   description?: string
   children: ReactNode
+  className?: string
 }
 
-export function Modal({ isOpen, onClose, title, description, children }: ModalProps) {
+export function Modal({ isOpen, onClose, title, description, children, className }: ModalProps) {
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === 'Escape') onClose()
@@ -40,7 +41,7 @@ export function Modal({ isOpen, onClose, title, description, children }: ModalPr
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
-        className="relative z-10 w-full max-w-lg max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-surface p-6 shadow-xl transition-all"
+        className={`relative z-10 w-full ${className || 'max-w-lg'} max-h-[90vh] overflow-y-auto rounded-xl border border-border bg-surface p-6 shadow-xl transition-all`}
       >
         <div className="flex items-start justify-between gap-4">
           <div>

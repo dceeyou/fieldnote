@@ -18,6 +18,7 @@ import {
   Cloud,
   RefreshCw,
   MapPin,
+  FileSpreadsheet,
 } from 'lucide-react'
 import {
   SRI_LANKA_AGRICULTURAL_REGIONS,
@@ -32,6 +33,7 @@ import { Card } from '../components/ui/Card.tsx'
 import { Modal } from '../components/ui/Modal.tsx'
 import { Input } from '../components/ui/Input.tsx'
 import { Select } from '../components/ui/Select.tsx'
+import { ExportModal } from '../components/export/ExportModal.tsx'
 import { FertilizerProductCatalog } from '../components/fertilizer/FertilizerProductCatalog.tsx'
 import { useTheme, type Theme } from '../app/ThemeProvider.tsx'
 import { isSupabaseConfigured, checkSupabaseConnection } from '../lib/supabase.ts'
@@ -91,6 +93,7 @@ export function Settings() {
   const [restoreError, setRestoreError] = useState<string | null>(null)
   const [restoreSuccess, setRestoreSuccess] = useState<string | null>(null)
   const [isRestoring, setIsRestoring] = useState(false)
+  const [isExcelExportModalOpen, setIsExcelExportModalOpen] = useState(false)
 
   // Supabase Cloud Sync
   const [syncStatus, setSyncStatus] = useState<string | null>(null)
@@ -657,6 +660,31 @@ export function Settings() {
             </div>
           )}
 
+          {/* Excel Export Card */}
+          <Card className="p-6">
+            <div className="flex items-start gap-3">
+              <div className="grid size-10 place-items-center rounded-xl bg-forest-50 text-forest-700 dark:bg-forest-700/20 dark:text-forest-100">
+                <FileSpreadsheet size={20} />
+              </div>
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className="font-semibold text-text">Export All Data to Excel</h3>
+                  <span className="rounded-full bg-forest-100 px-2 py-0.5 text-[10px] font-semibold text-forest-800 dark:bg-forest-800/40 dark:text-forest-200">
+                    .xlsx
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-muted max-w-xl">
+                  Export all financial transaction records and fertilizer application schedules into a structured Microsoft Excel workbook containing separate sheets for Transactions, Fertilizer Applications, and Summary.
+                </p>
+                <div className="mt-4">
+                  <Button onClick={() => setIsExcelExportModalOpen(true)}>
+                    <Download size={16} /> Export Data to Excel
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+
           {/* Export Card */}
           <Card className="p-6">
             <div className="flex items-start gap-3">
@@ -877,6 +905,12 @@ export function Settings() {
           </div>
         </div>
       </Modal>
+
+      {/* Export to Excel Modal */}
+      <ExportModal
+        isOpen={isExcelExportModalOpen}
+        onClose={() => setIsExcelExportModalOpen(false)}
+      />
     </div>
   )
 }

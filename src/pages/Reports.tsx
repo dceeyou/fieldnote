@@ -9,10 +9,12 @@ import {
   ArrowUpRight,
   Activity,
   Info,
+  Download,
 } from 'lucide-react'
 import { Button } from '../components/ui/Button.tsx'
 import { Card } from '../components/ui/Card.tsx'
 import { Select } from '../components/ui/Select.tsx'
+import { ExportModal } from '../components/export/ExportModal.tsx'
 import { getTransactions } from '../services/transactionService.ts'
 import {
   getMonthlyFinancials,
@@ -41,6 +43,7 @@ export function Reports() {
   const [landSummaries, setLandSummaries] = useState<EntityFinancialSummary[]>([])
   const [cropSummaries, setCropSummaries] = useState<EntityFinancialSummary[]>([])
   const [loading, setLoading] = useState(true)
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false)
 
   async function loadReportData() {
     setLoading(true)
@@ -100,6 +103,9 @@ export function Reports() {
           </Select>
           <Button variant="secondary" onClick={() => window.print()}>
             <Printer size={15} /> Print Report
+          </Button>
+          <Button onClick={() => setIsExportModalOpen(true)}>
+            <Download size={15} /> Export Data
           </Button>
         </div>
       </div>
@@ -453,6 +459,12 @@ export function Reports() {
           </Card>
         </div>
       )}
+
+      {/* Export to Excel Modal */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+      />
     </div>
   )
 }

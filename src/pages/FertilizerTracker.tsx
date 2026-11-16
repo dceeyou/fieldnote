@@ -12,12 +12,14 @@ import {
   Edit2,
   MapPin,
   Sprout,
+  Download,
 } from 'lucide-react'
 import { Button } from '../components/ui/Button.tsx'
 import { Card } from '../components/ui/Card.tsx'
 import { Modal } from '../components/ui/Modal.tsx'
 import { Input } from '../components/ui/Input.tsx'
 import { Select } from '../components/ui/Select.tsx'
+import { ExportModal } from '../components/export/ExportModal.tsx'
 import { FertilizerProductCatalog } from '../components/fertilizer/FertilizerProductCatalog.tsx'
 import {
   getFertilizerApplications,
@@ -65,6 +67,7 @@ export function FertilizerTracker() {
   // Modals
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [isCompleteModalOpen, setIsCompleteModalOpen] = useState(false)
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false)
   const [editingApp, setEditingApp] = useState<FertilizerApplication | null>(null)
   const [completingApp, setCompletingApp] = useState<FertilizerApplication | null>(null)
 
@@ -419,9 +422,14 @@ export function FertilizerTracker() {
           </p>
         </div>
         {activeTab === 'applications' && (
-          <Button onClick={openAddModal}>
-            <Plus size={17} /> Schedule application
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="secondary" onClick={() => setIsExportModalOpen(true)}>
+              <Download size={16} /> Export Data
+            </Button>
+            <Button onClick={openAddModal}>
+              <Plus size={17} /> Schedule application
+            </Button>
+          </div>
         )}
       </div>
 
@@ -929,6 +937,13 @@ export function FertilizerTracker() {
           </div>
         </form>
       </Modal>
+
+      {/* Export to Excel Modal */}
+      <ExportModal
+        isOpen={isExportModalOpen}
+        onClose={() => setIsExportModalOpen(false)}
+        initialDataType="fertilizer"
+      />
     </div>
   )
 }
