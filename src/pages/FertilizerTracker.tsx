@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Plus,
   Leaf,
@@ -17,6 +18,7 @@ import { Card } from '../components/ui/Card.tsx'
 import { Modal } from '../components/ui/Modal.tsx'
 import { Input } from '../components/ui/Input.tsx'
 import { Select } from '../components/ui/Select.tsx'
+import { FertilizerProductCatalog } from '../components/fertilizer/FertilizerProductCatalog.tsx'
 import {
   getFertilizerApplications,
   saveFertilizerApplication,
@@ -33,6 +35,12 @@ import { getFertilizerDueStatus } from '../utils/reminders.ts'
 import { formatLKR } from '../utils/calculations.ts'
 
 export function FertilizerTracker() {
+  const [searchParams] = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const [activeTab, setActiveTab] = useState<'applications' | 'products'>(
+    tabParam === 'products' ? 'products' : 'applications'
+  )
+
   const [applications, setApplications] = useState<FertilizerApplication[]>([])
   const [lands, setLands] = useState<LandWithCrops[]>([])
   const [crops, setCrops] = useState<Crop[]>([])
@@ -354,12 +362,47 @@ export function FertilizerTracker() {
             Log fertilizer applications, set next due dates, and monitor in-app reminders.
           </p>
         </div>
-        <Button onClick={openAddModal}>
-          <Plus size={17} /> Schedule application
-        </Button>
+        {activeTab === 'applications' && (
+          <Button onClick={openAddModal}>
+            <Plus size={17} /> Schedule application
+          </Button>
+        )}
       </div>
 
-      {/* Reminder Metric Cards */}
+      {/* View Switcher Tabs */}
+      <div className="mt-6 flex flex-wrap gap-2 border-b border-border pb-3">
+        <button
+          type="button"
+          onClick={() => setActiveTab('applications')}
+          className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'applications'
+              ? 'bg-forest-50 text-forest-700 dark:bg-forest-700/20 dark:text-forest-100 font-semibold'
+              : 'text-muted hover:bg-subtle hover:text-text'
+          }`}
+        >
+          <Clock size={16} /> Applications & Schedules
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab('products')}
+          className={`flex items-center gap-2 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
+            activeTab === 'products'
+              ? 'bg-forest-50 text-forest-700 dark:bg-forest-700/20 dark:text-forest-100 font-semibold'
+              : 'text-muted hover:bg-subtle hover:text-text'
+          }`}
+        >
+          <Leaf size={16} /> Fertilizer Products ({fertilizers.length})
+        </button>
+      </div>
+
+      {/* Tab Content */}
+      {activeTab === 'products' ? (
+        <div className="mt-6">
+          <FertilizerProductCatalog onProductChanged={loadMetadata} />
+        </div>
+      ) : (
+        <>
+          {/* Reminder Metric Cards */}
       <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <Card
           onClick={() => setStatusFilter('overdue')}
@@ -568,6 +611,8 @@ export function FertilizerTracker() {
           </Card>
         )}
       </div>
+      </>
+      )}
 
       {/* Add / Edit Application Modal */}
       <Modal

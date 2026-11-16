@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Tag,
   Sprout,
@@ -31,6 +32,7 @@ import { Card } from '../components/ui/Card.tsx'
 import { Modal } from '../components/ui/Modal.tsx'
 import { Input } from '../components/ui/Input.tsx'
 import { Select } from '../components/ui/Select.tsx'
+import { FertilizerProductCatalog } from '../components/fertilizer/FertilizerProductCatalog.tsx'
 import { useTheme, type Theme } from '../app/ThemeProvider.tsx'
 import { isSupabaseConfigured, checkSupabaseConnection } from '../lib/supabase.ts'
 import { uploadLocalToSupabase, downloadSupabaseToLocal } from '../services/syncService.ts'
@@ -46,8 +48,6 @@ import {
 } from '../services/cropService.ts'
 import {
   getAllFertilizers,
-  saveFertilizer,
-  deactivateFertilizer,
 } from '../services/fertilizerService.ts'
 import {
   downloadBackup,
@@ -59,7 +59,14 @@ import type { Category, Crop, Fertilizer } from '../data/db/schema.ts'
 
 export function Settings() {
   const { theme, setTheme } = useTheme()
-  const [activeTab, setActiveTab] = useState<'categories' | 'crops' | 'fertilizers' | 'general' | 'backup'>('categories')
+  const [searchParams] = useSearchParams()
+  const tabParam = searchParams.get('tab')
+  const initialTab =
+    tabParam && ['categories', 'crops', 'fertilizers', 'general', 'backup'].includes(tabParam)
+      ? (tabParam as 'categories' | 'crops' | 'fertilizers' | 'general' | 'backup')
+      : 'categories'
+
+  const [activeTab, setActiveTab] = useState<'categories' | 'crops' | 'fertilizers' | 'general' | 'backup'>(initialTab)
 
   // Categories
   const [categories, setCategories] = useState<Category[]>([])
@@ -76,12 +83,7 @@ export function Settings() {
   const [cropDesc, setCropDesc] = useState('')
 
   // Fertilizers
-  const [fertilizers, setFertilizers] = useState<Fertilizer[]>([])
-  const [isFertModalOpen, setIsFertModalOpen] = useState(false)
-  const [fertName, setFertName] = useState('')
-  const [fertType, setFertType] = useState('')
-  const [fertUnit, setFertUnit] = useState('kg')
-  const [fertNotes, setFertNotes] = useState('')
+  const [, setFertilizers] = useState<Fertilizer[]>([])
 
   // Backup & Restore
   const [isRestoreModalOpen, setIsRestoreModalOpen] = useState(false)
@@ -168,32 +170,6 @@ export function Settings() {
   async function handleDeactivateCrop(id: string, name: string) {
     if (window.confirm(`Deactivate crop "${name}"? Existing associations will remain intact.`)) {
       await deactivateCrop(id)
-      await loadAll()
-    }
-  }
-
-  // Fertilizer handlers
-  async function handleAddFertilizer(e: React.FormEvent) {
-    e.preventDefault()
-    if (!fertName.trim()) return
-    await saveFertilizer({
-      name: fertName.trim(),
-      type: fertType.trim() || undefined,
-      defaultUnit: fertUnit.trim() || undefined,
-      notes: fertNotes.trim() || undefined,
-      isActive: true,
-    })
-    setFertName('')
-    setFertType('')
-    setFertUnit('kg')
-    setFertNotes('')
-    setIsFertModalOpen(false)
-    await loadAll()
-  }
-
-  async function handleDeactivateFertilizer(id: string, name: string) {
-    if (window.confirm(`Deactivate fertilizer "${name}"? Historical applications will remain recorded.`)) {
-      await deactivateFertilizer(id)
       await loadAll()
     }
   }
@@ -469,49 +445,8 @@ export function Settings() {
 
       {/* Tab 3: Fertilizers */}
       {activeTab === 'fertilizers' && (
-        <div className="mt-6 space-y-6">
-          <div className="flex items-center justify-between">
-            <p className="text-sm text-muted">
-              Fertilizers and soil nutrients used across your cultivation areas.
-            </p>
-            <Button onClick={() => setIsFertModalOpen(true)}>
-              <Plus size={16} /> Add fertilizer product
-            </Button>
-          </div>
-
-          {fertilizers.length === 0 ? (
-            <Card className="p-8 text-center text-sm text-muted">
-              No fertilizer products added yet. Add your commonly used fertilizers to track schedules and applications.
-            </Card>
-          ) : (
-            <div className="grid gap-3 sm:grid-cols-2">
-              {fertilizers.map((fert) => (
-                <Card key={fert.id} className="flex items-start justify-between p-4">
-                  <div className="flex items-start gap-3">
-                    <div className="grid size-8 place-items-center rounded-lg bg-forest-50 text-forest-700 dark:bg-forest-700/20 dark:text-forest-200">
-                      <Leaf size={16} />
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-sm text-text">{fert.name}</h4>
-                      <p className="text-xs text-muted mt-0.5">
-                        {fert.type ? `${fert.type} · ` : ''}Default unit: {fert.defaultUnit || 'kg'}
-                      </p>
-                      {fert.notes && <p className="text-xs text-muted mt-1 italic">{fert.notes}</p>}
-                    </div>
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="hover:text-red-500"
-                    aria-label={`Deactivate ${fert.name}`}
-                    onClick={() => handleDeactivateFertilizer(fert.id, fert.name)}
-                  >
-                    <Archive size={15} />
-                  </Button>
-                </Card>
-              ))}
-            </div>
-          )}
+        <div className="mt-6">
+          <FertilizerProductCatalog onProductChanged={loadAll} />
         </div>
       )}
 
@@ -862,56 +797,6 @@ export function Settings() {
               Cancel
             </Button>
             <Button type="submit">Save Crop</Button>
-          </div>
-        </form>
-      </Modal>
-
-      {/* Fertilizer Modal */}
-      <Modal
-        isOpen={isFertModalOpen}
-        onClose={() => setIsFertModalOpen(false)}
-        title="Add Fertilizer Product"
-      >
-        <form onSubmit={handleAddFertilizer} className="space-y-4">
-          <Input
-            label="Fertilizer Name"
-            placeholder="e.g. Urea 46%, NPK 15:15:15, Dolomite, Compost"
-            value={fertName}
-            onChange={(e) => setFertName(e.target.value)}
-            required
-            autoFocus
-          />
-          <div className="grid grid-cols-2 gap-3">
-            <Input
-              label="Type (optional)"
-              placeholder="e.g. Inorganic, Organic, Foliar"
-              value={fertType}
-              onChange={(e) => setFertType(e.target.value)}
-            />
-            <Select
-              label="Default Unit"
-              value={fertUnit}
-              onChange={(e) => setFertUnit(e.target.value)}
-            >
-              <option value="kg">kg (Kilograms)</option>
-              <option value="g">g (Grams)</option>
-              <option value="L">L (Liters)</option>
-              <option value="ml">ml (Milliliters)</option>
-              <option value="bag">Bags (50kg)</option>
-              <option value="pack">Packs</option>
-            </Select>
-          </div>
-          <Input
-            label="Notes (optional)"
-            placeholder="Application precautions, dosage notes..."
-            value={fertNotes}
-            onChange={(e) => setFertNotes(e.target.value)}
-          />
-          <div className="flex justify-end gap-3 pt-3">
-            <Button type="button" variant="secondary" onClick={() => setIsFertModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit">Save Fertilizer</Button>
           </div>
         </form>
       </Modal>
