@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import {
   Plus,
   Search,
@@ -49,6 +50,13 @@ import {
 } from '../utils/date.ts'
 
 export function Transactions() {
+  const [searchParams] = useSearchParams()
+  const initialType = (searchParams.get('type') as 'income' | 'expense') || 'all'
+  const initialLand = searchParams.get('landId') || 'all'
+  const initialCrop = searchParams.get('cropId') || 'all'
+  const initialCat = searchParams.get('categoryId') || 'all'
+  const initialMonth = searchParams.get('month') // e.g. "2026-11"
+
   const [transactions, setTransactions] = useState<Transaction[]>([])
   const [lands, setLands] = useState<LandWithCrops[]>([])
   const [crops, setCrops] = useState<Crop[]>([])
@@ -57,13 +65,25 @@ export function Transactions() {
 
   // Filters State
   const [search, setSearch] = useState('')
-  const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>('all')
-  const [landFilter, setLandFilter] = useState('all')
-  const [cropFilter, setCropFilter] = useState('all')
-  const [categoryFilter, setCategoryFilter] = useState('all')
-  const [datePreset, setDatePreset] = useState<'all' | 'this_month' | 'custom'>('this_month')
-  const [startDate, setStartDate] = useState(() => `${getCurrentMonthColombo()}-01`)
-  const [endDate, setEndDate] = useState(() => getTodayColombo())
+  const [typeFilter, setTypeFilter] = useState<'all' | 'income' | 'expense'>(initialType)
+  const [landFilter, setLandFilter] = useState(initialLand)
+  const [cropFilter, setCropFilter] = useState(initialCrop)
+  const [categoryFilter, setCategoryFilter] = useState(initialCat)
+  const [datePreset, setDatePreset] = useState<'all' | 'this_month' | 'custom'>(
+    initialMonth ? 'custom' : 'this_month'
+  )
+  const [startDate, setStartDate] = useState(() => {
+    if (initialMonth) return `${initialMonth}-01`
+    return `${getCurrentMonthColombo()}-01`
+  })
+  const [endDate, setEndDate] = useState(() => {
+    if (initialMonth) {
+      const [y, m] = initialMonth.split('-').map(Number)
+      const lastDay = new Date(Date.UTC(y, m, 0)).getUTCDate()
+      return `${initialMonth}-${String(lastDay).padStart(2, '0')}`
+    }
+    return getTodayColombo()
+  })
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)

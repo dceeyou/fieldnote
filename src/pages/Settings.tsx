@@ -16,7 +16,16 @@ import {
   ShieldCheck,
   Cloud,
   RefreshCw,
+  MapPin,
 } from 'lucide-react'
+import {
+  SRI_LANKA_AGRICULTURAL_REGIONS,
+  type WeatherLocation,
+} from '../domain/weather.ts'
+import {
+  getSavedWeatherLocation,
+  saveWeatherLocation,
+} from '../services/weatherService.ts'
 import { Button } from '../components/ui/Button.tsx'
 import { Card } from '../components/ui/Card.tsx'
 import { Modal } from '../components/ui/Modal.tsx'
@@ -90,6 +99,10 @@ export function Settings() {
     ok: false,
     message: '',
   })
+
+  // Weather Location Preference
+  const [weatherLoc, setWeatherLoc] = useState<WeatherLocation>(() => getSavedWeatherLocation())
+  const [weatherSavedMsg, setWeatherSavedMsg] = useState<string | null>(null)
 
   const [loading, setLoading] = useState(true)
 
@@ -529,6 +542,61 @@ export function Settings() {
                   {label}
                 </button>
               ))}
+            </div>
+          </Card>
+
+          {/* Primary Weather Location Setting */}
+          <Card className="p-6">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-text">Primary Weather Location</h3>
+                <p className="text-xs text-muted mt-1">
+                  Configure the primary cultivation region for live agricultural weather forecasts and climate insights.
+                </p>
+              </div>
+              <span className="flex items-center gap-1 rounded-full bg-forest-50 px-2.5 py-0.5 text-xs font-semibold text-forest-700 dark:bg-forest-900/30 dark:text-forest-200">
+                <MapPin size={12} /> {weatherLoc.name}
+              </span>
+            </div>
+
+            {weatherSavedMsg && (
+              <div className="mt-3 rounded-lg border border-forest-200 bg-forest-50 p-2.5 text-xs text-forest-800 dark:border-forest-800/40 dark:bg-forest-950/40 dark:text-forest-200 flex items-center gap-2">
+                <CheckCircle2 size={14} />
+                <span>{weatherSavedMsg}</span>
+              </div>
+            )}
+
+            <div className="mt-4">
+              <label className="text-xs font-medium text-text block mb-2">
+                Select from Agricultural Regions:
+              </label>
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 md:grid-cols-5">
+                {SRI_LANKA_AGRICULTURAL_REGIONS.map((region) => {
+                  const isSelected =
+                    Math.abs(region.latitude - weatherLoc.latitude) < 0.001 &&
+                    Math.abs(region.longitude - weatherLoc.longitude) < 0.001
+                  return (
+                    <button
+                      key={region.name}
+                      type="button"
+                      onClick={() => {
+                        saveWeatherLocation(region)
+                        setWeatherLoc(region)
+                        setWeatherSavedMsg(`Primary weather location set to ${region.name} (${region.province}).`)
+                        setTimeout(() => setWeatherSavedMsg(null), 4000)
+                      }}
+                      className={`flex flex-col items-start rounded-lg border p-2.5 text-left text-xs transition-colors ${
+                        isSelected
+                          ? 'border-forest-600 bg-forest-50 font-semibold text-forest-800 dark:border-forest-500 dark:bg-forest-950/40 dark:text-forest-200'
+                          : 'border-border bg-surface text-text hover:bg-subtle'
+                      }`}
+                    >
+                      <span className="font-medium">{region.name}</span>
+                      <span className="text-[10px] text-muted truncate w-full">{region.province}</span>
+                    </button>
+                  )
+                })}
+              </div>
             </div>
           </Card>
 
