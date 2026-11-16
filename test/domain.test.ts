@@ -356,3 +356,20 @@ describe('CSV Import pipeline', () => {
   })
 })
 
+describe('Bulk transaction operations', () => {
+  it('correctly tracks selection set and bulk selection states', () => {
+    const ids = ['tx-1', 'tx-2', 'tx-3']
+    const selected = new Set(['tx-1', 'tx-2'])
+
+    assert.strictEqual(ids.every((id) => selected.has(id)), false)
+    assert.strictEqual(ids.some((id) => selected.has(id)), true)
+
+    selected.add('tx-3')
+    assert.strictEqual(ids.every((id) => selected.has(id)), true)
+
+    selected.clear()
+    assert.strictEqual(ids.some((id) => selected.has(id)), false)
+  })
+})
+
+

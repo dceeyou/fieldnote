@@ -83,3 +83,9 @@ export async function saveTransaction(input: TransactionInput, id?: string): Pro
 export async function deleteTransaction(id: string): Promise<void> {
   await db.transactions.delete(id)
 }
+
+export async function bulkDeleteTransactions(ids: string[]): Promise<number> {
+  if (ids.length === 0) return 0
+  await db.transactions.bulkDelete(ids)
+  return ids.length
+}

@@ -24,6 +24,7 @@ import {
   getTransactions,
   saveTransaction,
   deleteTransaction,
+  bulkDeleteTransactions,
   type TransactionFilters,
 } from '../services/transactionService.ts'
 import { getAllLandsWithCrops, type LandWithCrops } from '../services/landService.ts'
@@ -90,6 +91,11 @@ export function Transactions() {
   const [importSuccess, setImportSuccess] = useState<string | null>(null)
   const [defaultImportLandId, setDefaultImportLandId] = useState('')
   const [isImporting, setIsImporting] = useState(false)
+
+  // Bulk Selection State
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleteSuccess, setBulkDeleteSuccess] = useState<string | null>(null)
+  const [isBulkDeleting, setIsBulkDeleting] = useState(false)
 
   // Quick lookup maps
   const landMap = useMemo(() => new Map(lands.map((l) => [l.id, l.name])), [lands])
@@ -251,9 +257,77 @@ export function Transactions() {
     }
   }
 
+  const visibleTxIds = useMemo(() => transactions.map((t) => t.id), [transactions])
+
+  const isAllVisibleSelected = useMemo(() => {
+    return visibleTxIds.length > 0 && visibleTxIds.every((id) => selectedIds.has(id))
+  }, [visibleTxIds, selectedIds])
+
+  const isSomeVisibleSelected = useMemo(() => {
+    return visibleTxIds.some((id) => selectedIds.has(id))
+  }, [visibleTxIds, selectedIds])
+
+  function toggleSelectAllVisible() {
+    if (isAllVisibleSelected) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(visibleTxIds))
+    }
+  }
+
+  function toggleSelect(id: string) {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) {
+        next.delete(id)
+      } else {
+        next.add(id)
+      }
+      return next
+    })
+  }
+
+  function clearSelection() {
+    setSelectedIds(new Set())
+  }
+
+  async function handleBulkDelete() {
+    const count = selectedIds.size
+    if (count === 0) return
+
+    if (
+      !window.confirm(
+        `Are you sure you want to delete ${count} selected transaction${
+          count > 1 ? 's' : ''
+        }? This action cannot be undone.`
+      )
+    ) {
+      return
+    }
+
+    setIsBulkDeleting(true)
+    setBulkDeleteSuccess(null)
+    try {
+      await bulkDeleteTransactions(Array.from(selectedIds))
+      setSelectedIds(new Set())
+      setBulkDeleteSuccess(`Successfully deleted ${count} transaction${count > 1 ? 's' : ''}.`)
+      await loadTransactions()
+    } finally {
+      setIsBulkDeleting(false)
+    }
+  }
+
   async function handleDelete(id: string, desc: string) {
     if (window.confirm(`Delete transaction "${desc}"? This action cannot be undone.`)) {
       await deleteTransaction(id)
+      setSelectedIds((prev) => {
+        if (prev.has(id)) {
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        }
+        return prev
+      })
       await loadTransactions()
     }
   }
@@ -433,8 +507,23 @@ export function Transactions() {
 
       {importSuccess && (
         <div className="mt-4 rounded-lg border border-forest-200 bg-forest-50 p-4 text-xs font-medium text-forest-800 dark:border-forest-800/40 dark:bg-forest-950/40 dark:text-forest-200 flex items-center justify-between">
-          <span>{importSuccess}</span>
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={16} className="text-forest-600" />
+            <span>{importSuccess}</span>
+          </div>
           <button onClick={() => setImportSuccess(null)} className="text-muted hover:text-text">
+            &times;
+          </button>
+        </div>
+      )}
+
+      {bulkDeleteSuccess && (
+        <div className="mt-4 rounded-lg border border-forest-200 bg-forest-50 p-4 text-xs font-medium text-forest-800 dark:border-forest-800/40 dark:bg-forest-950/40 dark:text-forest-200 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 size={16} className="text-forest-600" />
+            <span>{bulkDeleteSuccess}</span>
+          </div>
+          <button onClick={() => setBulkDeleteSuccess(null)} className="text-muted hover:text-text">
             &times;
           </button>
         </div>
@@ -598,6 +687,54 @@ export function Transactions() {
         </div>
       </Card>
 
+      {/* Bulk Action Bar */}
+      {selectedIds.size > 0 && (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-forest-300 bg-forest-50/90 p-3.5 text-xs text-forest-900 shadow-xs dark:border-forest-700/60 dark:bg-forest-950/80 dark:text-forest-100">
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="grid size-6 place-items-center rounded-md bg-forest-600 text-white font-bold text-xs">
+              {selectedIds.size}
+            </span>
+            <span className="font-medium">
+              {selectedIds.size === 1
+                ? '1 transaction selected'
+                : `${selectedIds.size} transactions selected`}
+            </span>
+            <span className="text-muted">·</span>
+            <button
+              type="button"
+              onClick={toggleSelectAllVisible}
+              className="text-forest-700 dark:text-forest-300 underline font-medium hover:text-forest-900 dark:hover:text-forest-100 cursor-pointer"
+            >
+              {isAllVisibleSelected
+                ? 'Deselect visible'
+                : `Select all visible (${transactions.length})`}
+            </button>
+            <button
+              type="button"
+              onClick={clearSelection}
+              className="text-muted hover:text-text font-medium ml-1 cursor-pointer"
+            >
+              Clear selection
+            </button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={handleBulkDelete}
+              disabled={isBulkDeleting}
+              className="gap-1.5"
+            >
+              <Trash2 size={14} />
+              {isBulkDeleting
+                ? 'Deleting...'
+                : `Delete selected (${selectedIds.size})`}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Transactions Table / List */}
       <div className="mt-6">
         {loading ? (
@@ -623,6 +760,18 @@ export function Transactions() {
               <table className="w-full text-left text-sm">
                 <thead className="border-b border-border bg-subtle/50 text-xs font-semibold text-muted uppercase tracking-wider">
                   <tr>
+                    <th className="py-3 px-3 w-10 text-center">
+                      <input
+                        type="checkbox"
+                        checked={isAllVisibleSelected}
+                        ref={(el) => {
+                          if (el) el.indeterminate = isSomeVisibleSelected && !isAllVisibleSelected
+                        }}
+                        onChange={toggleSelectAllVisible}
+                        aria-label="Select all visible transactions"
+                        className="size-4 rounded border-border text-forest-600 focus:ring-forest-500 cursor-pointer"
+                      />
+                    </th>
                     <th className="py-3 px-4">Date</th>
                     <th className="py-3 px-4">Description</th>
                     <th className="py-3 px-4">Cultivation Land</th>
@@ -635,8 +784,25 @@ export function Transactions() {
                 <tbody className="divide-y divide-border">
                   {transactions.map((tx) => {
                     const isIncome = tx.type === 'income'
+                    const isSelected = selectedIds.has(tx.id)
                     return (
-                      <tr key={tx.id} className="hover:bg-subtle/40 transition-colors">
+                      <tr
+                        key={tx.id}
+                        className={`transition-colors ${
+                          isSelected
+                            ? 'bg-forest-50/70 dark:bg-forest-950/40 hover:bg-forest-100/70 dark:hover:bg-forest-900/50'
+                            : 'hover:bg-subtle/40'
+                        }`}
+                      >
+                        <td className="py-3.5 px-3 text-center">
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            onChange={() => toggleSelect(tx.id)}
+                            aria-label={`Select transaction ${tx.description}`}
+                            className="size-4 rounded border-border text-forest-600 focus:ring-forest-500 cursor-pointer"
+                          />
+                        </td>
                         <td className="py-3.5 px-4 whitespace-nowrap text-xs text-muted">
                           {formatDateDisplay(tx.date)}
                         </td>
