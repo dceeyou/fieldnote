@@ -14,6 +14,8 @@ import {
   Upload,
   AlertTriangle,
   ShieldCheck,
+  Cloud,
+  RefreshCw,
 } from 'lucide-react'
 import { Button } from '../components/ui/Button.tsx'
 import { Card } from '../components/ui/Card.tsx'
@@ -21,6 +23,8 @@ import { Modal } from '../components/ui/Modal.tsx'
 import { Input } from '../components/ui/Input.tsx'
 import { Select } from '../components/ui/Select.tsx'
 import { useTheme, type Theme } from '../app/ThemeProvider.tsx'
+import { isSupabaseConfigured, checkSupabaseConnection } from '../lib/supabase.ts'
+import { uploadLocalToSupabase, downloadSupabaseToLocal } from '../services/syncService.ts'
 import {
   getAllCategories,
   saveCategory,
@@ -76,6 +80,16 @@ export function Settings() {
   const [restoreError, setRestoreError] = useState<string | null>(null)
   const [restoreSuccess, setRestoreSuccess] = useState<string | null>(null)
   const [isRestoring, setIsRestoring] = useState(false)
+
+  // Supabase Cloud Sync
+  const [syncStatus, setSyncStatus] = useState<string | null>(null)
+  const [syncError, setSyncError] = useState<string | null>(null)
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [connCheck, setConnCheck] = useState<{ checked: boolean; ok: boolean; message: string }>({
+    checked: false,
+    ok: false,
+    message: '',
+  })
 
   const [loading, setLoading] = useState(true)
 
@@ -223,6 +237,47 @@ export function Settings() {
       }
     } finally {
       setIsRestoring(false)
+    }
+  }
+
+  async function handleCheckConnection() {
+    const res = await checkSupabaseConnection()
+    setConnCheck({ checked: true, ok: res.ok, message: res.message })
+  }
+
+  async function handleCloudUpload() {
+    setIsSyncing(true)
+    setSyncError(null)
+    setSyncStatus(null)
+    try {
+      const res = await uploadLocalToSupabase()
+      if (res.success) {
+        setSyncStatus(res.message)
+      } else {
+        setSyncError(res.message)
+      }
+    } finally {
+      setIsSyncing(false)
+    }
+  }
+
+  async function handleCloudDownload() {
+    if (!window.confirm('Sync from Supabase will merge cloud data into your local database. Continue?')) {
+      return
+    }
+    setIsSyncing(true)
+    setSyncError(null)
+    setSyncStatus(null)
+    try {
+      const res = await downloadSupabaseToLocal()
+      if (res.success) {
+        setSyncStatus(res.message)
+        await loadAll()
+      } else {
+        setSyncError(res.message)
+      }
+    } finally {
+      setIsSyncing(false)
     }
   }
 
@@ -506,6 +561,90 @@ export function Settings() {
       {/* Tab 5: Backup & Data Safety */}
       {activeTab === 'backup' && (
         <div className="mt-6 space-y-6">
+          {/* Supabase Cloud Sync Card */}
+          <Card className="p-6">
+            <div className="flex items-start gap-3">
+              <div className="grid size-10 place-items-center rounded-xl bg-forest-50 text-forest-700 dark:bg-forest-700/20 dark:text-forest-100">
+                <Cloud size={20} />
+              </div>
+              <div className="flex-1">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="font-semibold text-text">Supabase Cloud Sync</h3>
+                  <span
+                    className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] font-semibold ${
+                      isSupabaseConfigured
+                        ? 'bg-forest-50 text-forest-700 dark:bg-forest-900/30 dark:text-forest-300 border border-forest-200 dark:border-forest-800'
+                        : 'bg-amber-50 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border border-amber-200 dark:border-amber-800'
+                    }`}
+                  >
+                    <span className={`size-1.5 rounded-full ${isSupabaseConfigured ? 'bg-forest-600' : 'bg-amber-500'}`} />
+                    {isSupabaseConfigured ? 'Connected (.env.local)' : 'Not Configured'}
+                  </span>
+                </div>
+
+                <p className="mt-1 text-xs text-muted max-w-xl">
+                  Synchronize your farm records (lands, crops, categories, fertilizers, transactions, schedules) with your cloud Supabase database for off-site backup and multi-device access.
+                </p>
+
+                {syncStatus && (
+                  <div className="mt-3 rounded-lg border border-forest-200 bg-forest-50 p-3 text-xs text-forest-800 dark:border-forest-800/40 dark:bg-forest-950/40 dark:text-forest-200 flex items-center justify-between">
+                    <span>{syncStatus}</span>
+                    <button onClick={() => setSyncStatus(null)} className="text-muted hover:text-text">&times;</button>
+                  </div>
+                )}
+
+                {syncError && (
+                  <div className="mt-3 rounded-lg border border-red-200 bg-red-50 p-3 text-xs text-red-800 dark:border-red-800/40 dark:bg-red-950/40 dark:text-red-200 flex items-center justify-between">
+                    <span>{syncError}</span>
+                    <button onClick={() => setSyncError(null)} className="text-muted hover:text-text">&times;</button>
+                  </div>
+                )}
+
+                {connCheck.checked && (
+                  <div
+                    className={`mt-3 rounded-lg border p-3 text-xs flex items-center gap-2 ${
+                      connCheck.ok
+                        ? 'border-forest-200 bg-forest-50 text-forest-800 dark:border-forest-800/40 dark:bg-forest-950/40 dark:text-forest-200'
+                        : 'border-red-200 bg-red-50 text-red-800 dark:border-red-800/40 dark:bg-red-950/40 dark:text-red-200'
+                    }`}
+                  >
+                    {connCheck.ok ? <CheckCircle2 size={15} /> : <AlertTriangle size={15} />}
+                    <span>{connCheck.message}</span>
+                  </div>
+                )}
+
+                <div className="mt-4 flex flex-wrap items-center gap-3">
+                  <Button
+                    onClick={handleCloudUpload}
+                    disabled={isSyncing || !isSupabaseConfigured}
+                    className="gap-2"
+                  >
+                    <Upload size={15} />
+                    {isSyncing ? 'Uploading...' : 'Push to Cloud'}
+                  </Button>
+                  <Button
+                    variant="secondary"
+                    onClick={handleCloudDownload}
+                    disabled={isSyncing || !isSupabaseConfigured}
+                    className="gap-2"
+                  >
+                    <Download size={15} />
+                    Pull from Cloud
+                  </Button>
+                  <Button
+                    variant="ghost"
+                    onClick={handleCheckConnection}
+                    disabled={!isSupabaseConfigured}
+                    className="gap-1.5 text-xs"
+                  >
+                    <RefreshCw size={14} className={isSyncing ? 'animate-spin' : ''} />
+                    Test Connection
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </Card>
+
           {restoreSuccess && (
             <div className="rounded-lg border border-forest-200 bg-forest-50 p-4 text-xs font-medium text-forest-800 dark:border-forest-800/40 dark:bg-forest-950/40 dark:text-forest-200 flex items-center justify-between">
               <span>{restoreSuccess}</span>
