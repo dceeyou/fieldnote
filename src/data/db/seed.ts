@@ -1,26 +1,18 @@
 import { db } from './database.ts'
 import type { Category, Crop, Land } from './schema.ts'
+import { ALL_DEFAULT_CATEGORIES } from '../../domain/category.ts'
 
 const now = new Date().toISOString()
 
-export const DEFAULT_CATEGORIES: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>[] = [
-  // Income
-  { name: 'Crop Sales', type: 'income', description: 'Proceeds from harvested crops', isActive: true, sortOrder: 1 },
-  { name: 'Harvest Sales', type: 'income', description: 'Bulk harvest sales', isActive: true, sortOrder: 2 },
-  { name: 'Subsidies & Grants', type: 'income', description: 'Government or institutional support', isActive: true, sortOrder: 3 },
-  { name: 'Other Income', type: 'income', description: 'Miscellaneous farm income', isActive: true, sortOrder: 4 },
-
-  // Expense
-  { name: 'Fertilizer & Nutrients', type: 'expense', description: 'Organic & chemical fertilizers', isActive: true, sortOrder: 10 },
-  { name: 'Seeds & Seedlings', type: 'expense', description: 'Planting material and nursery plants', isActive: true, sortOrder: 11 },
-  { name: 'Labor & Wages', type: 'expense', description: 'Daily worker and contracted wages', isActive: true, sortOrder: 12 },
-  { name: 'Pest & Weed Control', type: 'expense', description: 'Agrochemicals and weed management', isActive: true, sortOrder: 13 },
-  { name: 'Machinery & Fuel', type: 'expense', description: 'Tractor hire, fuel, and equipment', isActive: true, sortOrder: 14 },
-  { name: 'Land Prep & Irrigation', type: 'expense', description: 'Tilling, digging, and watering setup', isActive: true, sortOrder: 15 },
-  { name: 'Tools & Maintenance', type: 'expense', description: 'Farm tools, servicing and repairs', isActive: true, sortOrder: 16 },
-  { name: 'Transport & Storage', type: 'expense', description: 'Haulage and storage costs', isActive: true, sortOrder: 17 },
-  { name: 'Other Expense', type: 'expense', description: 'General and unexpected expenses', isActive: true, sortOrder: 18 },
-]
+export const DEFAULT_CATEGORIES: Omit<Category, 'id' | 'createdAt' | 'updatedAt'>[] =
+  ALL_DEFAULT_CATEGORIES.map((c, idx) => ({
+    name: c.name,
+    type: c.type,
+    description: c.description,
+    keywords: c.keywords,
+    isActive: true,
+    sortOrder: idx + 1,
+  }))
 
 export const DEFAULT_CROPS: Omit<Crop, 'id' | 'createdAt' | 'updatedAt'>[] = [
   { name: 'Ginger', description: 'High-value rhizome cash crop', isActive: true },

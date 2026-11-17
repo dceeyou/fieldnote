@@ -34,6 +34,8 @@ import {
 import { getAllLandsWithCrops, type LandWithCrops } from '../services/landService.ts'
 import { getAllCrops } from '../services/cropService.ts'
 import { getAllCategories } from '../services/categoryService.ts'
+import { suggestCategory } from '../domain/category.ts'
+import { CategorySuggestionBadge } from '../components/categories/CategorySuggestionBadge.tsx'
 import {
   parseCsvText,
   detectColumnMapping,
@@ -182,6 +184,21 @@ export function Transactions() {
     [categories, txType]
   )
 
+  // Suggestion State
+  const [dismissedSuggestionForDesc, setDismissedSuggestionForDesc] = useState<string | null>(null)
+
+  const categorySuggestion = useMemo(() => {
+    if (!txDescription.trim() && !txCropId) return null
+    if (dismissedSuggestionForDesc === txDescription.trim()) return null
+    return suggestCategory({
+      description: txDescription,
+      type: txType,
+      cropId: txCropId || undefined,
+      categories,
+      crops,
+    })
+  }, [txDescription, txType, txCropId, categories, crops, dismissedSuggestionForDesc])
+
   // Associated crops for currently selected land in modal
   const cropsForSelectedLand = useMemo(() => {
     if (!txLandId) return crops.filter((c) => c.isActive)
@@ -206,6 +223,7 @@ export function Transactions() {
     setTxReference('')
     setTxNotes('')
     setFormError(null)
+    setDismissedSuggestionForDesc(null)
     setIsModalOpen(true)
   }
 
@@ -222,6 +240,7 @@ export function Transactions() {
     setTxReference(tx.referenceNumber || '')
     setTxNotes(tx.notes || '')
     setFormError(null)
+    setDismissedSuggestionForDesc(null)
     setIsModalOpen(true)
   }
 
@@ -1027,6 +1046,20 @@ export function Transactions() {
             onChange={(e) => setTxDescription(e.target.value)}
             required
           />
+
+          {/* Intelligent Category Recommendation Banner */}
+          {categorySuggestion && (
+            <CategorySuggestionBadge
+              suggestion={categorySuggestion}
+              currentCategoryId={txCategoryId}
+              onAccept={(catId) => {
+                setTxCategoryId(catId)
+              }}
+              onDismiss={() => {
+                setDismissedSuggestionForDesc(txDescription.trim())
+              }}
+            />
+          )}
 
           <div className="grid grid-cols-2 gap-3">
             <Select

@@ -42,6 +42,7 @@ create table if not exists public.categories (
   name text not null,
   type text not null check (type in ('income', 'expense')),
   description text,
+  keywords text[] default '{}',
   is_active boolean default true not null,
   sort_order integer default 0 not null,
   created_at timestamptz default now() not null,
@@ -110,14 +111,14 @@ alter table public.fertilizers enable row level security;
 alter table public.transactions enable row level security;
 alter table public.fertilizer_applications enable row level security;
 
--- Open policies for farm workspace operations (anon & authenticated)
-create policy "Allow all operations on lands" on public.lands for all using (true) with check (true);
-create policy "Allow all operations on crops" on public.crops for all using (true) with check (true);
-create policy "Allow all operations on land_crops" on public.land_crops for all using (true) with check (true);
-create policy "Allow all operations on categories" on public.categories for all using (true) with check (true);
-create policy "Allow all operations on fertilizers" on public.fertilizers for all using (true) with check (true);
-create policy "Allow all operations on transactions" on public.transactions for all using (true) with check (true);
-create policy "Allow all operations on fertilizer_applications" on public.fertilizer_applications for all using (true) with check (true);
+-- Strict single-user administrator policies (authenticated only; anon/unauthenticated requests are denied)
+create policy "Authenticated access to lands" on public.lands for all to authenticated using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Authenticated access to crops" on public.crops for all to authenticated using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Authenticated access to land_crops" on public.land_crops for all to authenticated using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Authenticated access to categories" on public.categories for all to authenticated using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Authenticated access to fertilizers" on public.fertilizers for all to authenticated using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Authenticated access to transactions" on public.transactions for all to authenticated using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+create policy "Authenticated access to fertilizer_applications" on public.fertilizer_applications for all to authenticated using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
 
 -- Indexes for optimal query performance
 create index if not exists idx_transactions_date on public.transactions(date desc);

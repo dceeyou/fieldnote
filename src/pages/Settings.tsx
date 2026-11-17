@@ -32,17 +32,13 @@ import { Button } from '../components/ui/Button.tsx'
 import { Card } from '../components/ui/Card.tsx'
 import { Modal } from '../components/ui/Modal.tsx'
 import { Input } from '../components/ui/Input.tsx'
-import { Select } from '../components/ui/Select.tsx'
 import { ExportModal } from '../components/export/ExportModal.tsx'
 import { FertilizerProductCatalog } from '../components/fertilizer/FertilizerProductCatalog.tsx'
 import { useTheme, type Theme } from '../app/ThemeProvider.tsx'
 import { isSupabaseConfigured, checkSupabaseConnection } from '../lib/supabase.ts'
 import { uploadLocalToSupabase, downloadSupabaseToLocal } from '../services/syncService.ts'
-import {
-  getAllCategories,
-  saveCategory,
-  deactivateCategory,
-} from '../services/categoryService.ts'
+import { getAllCategories } from '../services/categoryService.ts'
+import { CategoryManagement } from '../components/categories/CategoryManagement.tsx'
 import {
   getAllCrops,
   saveCrop,
@@ -72,11 +68,6 @@ export function Settings() {
 
   // Categories
   const [categories, setCategories] = useState<Category[]>([])
-  const [categoryTypeFilter, setCategoryTypeFilter] = useState<'expense' | 'income'>('expense')
-  const [isCatModalOpen, setIsCatModalOpen] = useState(false)
-  const [catName, setCatName] = useState('')
-  const [catType, setCatType] = useState<'income' | 'expense'>('expense')
-  const [catDesc, setCatDesc] = useState('')
 
   // Crops
   const [crops, setCrops] = useState<Crop[]>([])
@@ -115,7 +106,7 @@ export function Settings() {
     setLoading(true)
     try {
       const [allCats, allCrops, allFerts] = await Promise.all([
-        getAllCategories(false),
+        getAllCategories(true),
         getAllCrops(false),
         getAllFertilizers(false),
       ])
@@ -130,30 +121,6 @@ export function Settings() {
   useEffect(() => {
     loadAll()
   }, [])
-
-  // Category handlers
-  async function handleAddCategory(e: React.FormEvent) {
-    e.preventDefault()
-    if (!catName.trim()) return
-    await saveCategory({
-      name: catName.trim(),
-      type: catType,
-      description: catDesc.trim() || undefined,
-      sortOrder: categories.length + 1,
-      isActive: true,
-    })
-    setCatName('')
-    setCatDesc('')
-    setIsCatModalOpen(false)
-    await loadAll()
-  }
-
-  async function handleDeactivateCategory(id: string, name: string) {
-    if (window.confirm(`Deactivate category "${name}"? Historical transactions will retain this category.`)) {
-      await deactivateCategory(id)
-      await loadAll()
-    }
-  }
 
   // Crop handlers
   async function handleAddCrop(e: React.FormEvent) {
@@ -273,8 +240,6 @@ export function Settings() {
     }
   }
 
-  const filteredCategories = categories.filter((c) => c.type === categoryTypeFilter)
-
   return (
     <div className="mx-auto max-w-5xl py-8 sm:py-10">
       <div>
@@ -341,67 +306,12 @@ export function Settings() {
 
       {/* Tab 1: Categories */}
       {activeTab === 'categories' && (
-        <div className="mt-6 space-y-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-2 rounded-lg border border-border p-1 bg-surface">
-              <button
-                onClick={() => setCategoryTypeFilter('expense')}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                  categoryTypeFilter === 'expense'
-                    ? 'bg-forest-600 text-white'
-                    : 'text-muted hover:text-text'
-                }`}
-              >
-                Expense Categories ({categories.filter((c) => c.type === 'expense').length})
-              </button>
-              <button
-                onClick={() => setCategoryTypeFilter('income')}
-                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                  categoryTypeFilter === 'income'
-                    ? 'bg-forest-600 text-white'
-                    : 'text-muted hover:text-text'
-                }`}
-              >
-                Income Categories ({categories.filter((c) => c.type === 'income').length})
-              </button>
-            </div>
-            <Button
-              onClick={() => {
-                setCatType(categoryTypeFilter)
-                setIsCatModalOpen(true)
-              }}
-            >
-              <Plus size={16} /> Add {categoryTypeFilter} category
-            </Button>
-          </div>
-
-          <Card className="divide-y divide-border overflow-hidden">
-            {loading ? (
-              <div className="p-8 text-center text-sm text-muted">Loading categories...</div>
-            ) : filteredCategories.length === 0 ? (
-              <div className="p-8 text-center text-sm text-muted">No categories created yet.</div>
-            ) : (
-              filteredCategories.map((cat) => (
-                <div key={cat.id} className="flex items-center justify-between p-4 hover:bg-subtle/50">
-                  <div>
-                    <span className="font-medium text-text text-sm">{cat.name}</span>
-                    {cat.description && (
-                      <p className="text-xs text-muted mt-0.5">{cat.description}</p>
-                    )}
-                  </div>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="hover:text-red-500"
-                    aria-label={`Deactivate ${cat.name}`}
-                    onClick={() => handleDeactivateCategory(cat.id, cat.name)}
-                  >
-                    <Archive size={15} />
-                  </Button>
-                </div>
-              ))
-            )}
-          </Card>
+        <div className="mt-6">
+          <CategoryManagement
+            categories={categories}
+            onRefresh={loadAll}
+            loading={loading}
+          />
         </div>
       )}
 
@@ -760,44 +670,6 @@ export function Settings() {
           </Card>
         </div>
       )}
-
-      {/* Category Modal */}
-      <Modal
-        isOpen={isCatModalOpen}
-        onClose={() => setIsCatModalOpen(false)}
-        title={`Add ${catType === 'income' ? 'Income' : 'Expense'} Category`}
-      >
-        <form onSubmit={handleAddCategory} className="space-y-4">
-          <Input
-            label="Category Name"
-            placeholder="e.g. Organic Manure, Machinery Rent"
-            value={catName}
-            onChange={(e) => setCatName(e.target.value)}
-            required
-            autoFocus
-          />
-          <Select
-            label="Type"
-            value={catType}
-            onChange={(e) => setCatType(e.target.value as 'income' | 'expense')}
-          >
-            <option value="expense">Expense</option>
-            <option value="income">Income</option>
-          </Select>
-          <Input
-            label="Description (optional)"
-            placeholder="Short description for reference"
-            value={catDesc}
-            onChange={(e) => setCatDesc(e.target.value)}
-          />
-          <div className="flex justify-end gap-3 pt-3">
-            <Button type="button" variant="secondary" onClick={() => setIsCatModalOpen(false)}>
-              Cancel
-            </Button>
-            <Button type="submit">Save Category</Button>
-          </div>
-        </form>
-      </Modal>
 
       {/* Crop Modal */}
       <Modal
