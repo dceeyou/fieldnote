@@ -1,7 +1,21 @@
+# Dependencies
 node_modules/
+
+# Production build output
 dist/
-.DS_Store
-*.local
+
+# Vercel deployment cache & local project state
+.vercel/
+
+# Environment files (never commit secrets)
 .env
 .env.*
+*.local
 !.env.example
+
+# OS and IDE
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/

@@ -6,12 +6,19 @@ import { fileURLToPath } from 'node:url'
 
 const projectRoot = dirname(dirname(fileURLToPath(import.meta.url)))
 const viteCli = join(projectRoot, 'node_modules', 'vite', 'bin', 'vite.js')
-const aliasDirectory = mkdtempSync(join(tmpdir(), 'agriculture-management-'))
-const safeRoot = join(aliasDirectory, 'project')
 
+let safeRoot = projectRoot
 // Vite treats # in filesystem paths as a URL fragment. Use a temporary link
-// so this project remains runnable from its existing folder name.
-symlinkSync(projectRoot, safeRoot, 'dir')
+// when running from directories containing # (e.g. local macOS folders).
+if (projectRoot.includes('#')) {
+  try {
+    const aliasDirectory = mkdtempSync(join(tmpdir(), 'agriculture-management-'))
+    safeRoot = join(aliasDirectory, 'project')
+    symlinkSync(projectRoot, safeRoot, 'dir')
+  } catch {
+    safeRoot = projectRoot
+  }
+}
 
 const child = spawn(process.execPath, [viteCli, ...process.argv.slice(2)], {
   cwd: safeRoot,

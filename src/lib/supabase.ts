@@ -8,11 +8,16 @@ function getEnvVar(key: string): string {
   return proc?.env?.[key] || ''
 }
 
-export const supabaseUrl = getEnvVar('VITE_SUPABASE_URL')
-export const supabaseAnonKey = getEnvVar('VITE_SUPABASE_ANON_KEY')
+export const supabaseUrl =
+  getEnvVar('VITE_SUPABASE_URL') || getEnvVar('NEXT_PUBLIC_SUPABASE_URL')
+export const supabaseAnonKey =
+  getEnvVar('VITE_SUPABASE_ANON_KEY') || getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY')
 
 export const isSupabaseConfigured = Boolean(
-  supabaseUrl && supabaseAnonKey && supabaseUrl !== 'https://your-project.supabase.co'
+  supabaseUrl &&
+    supabaseAnonKey &&
+    supabaseUrl !== 'https://your-project.supabase.co' &&
+    supabaseAnonKey !== 'your-anon-or-publishable-key'
 )
 
 /**

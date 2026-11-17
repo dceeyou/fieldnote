@@ -32,6 +32,8 @@ import { FertilizerTracker } from '../pages/FertilizerTracker.tsx'
 import { Dashboard } from '../pages/Dashboard.tsx'
 import { Reports } from '../pages/Reports.tsx'
 import { seedDatabaseIfEmpty } from '../data/db/seed.ts'
+import { MobileBottomNav } from '../components/navigation/MobileBottomNav.tsx'
+import { OfflineIndicator } from '../components/pwa/OfflineIndicator.tsx'
 
 const navigation = [
   { label: 'Dashboard', to: '/', icon: LayoutDashboard },
@@ -184,6 +186,7 @@ function WorkspaceLayout() {
 
   return (
     <div className="min-h-screen bg-canvas text-text">
+      <OfflineIndicator />
       {/* Desktop Sidebar */}
       <div className="hidden md:fixed md:inset-y-0 md:flex">
         <Sidebar />
@@ -252,13 +255,16 @@ function WorkspaceLayout() {
           </div>
         </header>
 
-        <main className="min-h-[calc(100vh-4rem)] px-4 sm:px-7">
+        <main className="min-h-[calc(100vh-4rem)] px-4 sm:px-7 pb-24 md:pb-8">
           <Outlet />
           <footer className="mx-auto flex max-w-6xl items-center justify-between border-t border-border py-5 text-xs text-muted">
             <span>Local-first workspace · LKR · Asia/Colombo</span>
             <span>Stage 01 foundation · Single-Admin Auth</span>
           </footer>
         </main>
+
+        {/* Mobile Navigation Bar */}
+        <MobileBottomNav />
       </div>
     </div>
   )

@@ -80,3 +80,27 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     </RootErrorBoundary>
   </React.StrictMode>,
 )
+
+// Register PWA Service Worker for offline capability & desktop/mobile installation
+if (typeof window !== 'undefined' && 'serviceWorker' in navigator && window.location.protocol.startsWith('http')) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker
+      .register('/sw.js')
+      .then((registration) => {
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing
+          if (newWorker) {
+            newWorker.addEventListener('statechange', () => {
+              if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
+                console.log('AgriFlow updated. Refresh to apply latest version.')
+              }
+            })
+          }
+        })
+      })
+      .catch((err) => {
+        console.warn('Service Worker registration skipped or failed:', err)
+      })
+  })
+}
+

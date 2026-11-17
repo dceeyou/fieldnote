@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <rect width="512" height="512" rx="112" fill="#386642" />
+  <g fill="none" stroke="#ffffff" stroke-width="26" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Cabin Roof & Frame -->
+    <path d="M120 180 L250 180" />
+    <path d="M140 180 L140 300" />
+    <path d="M240 180 L240 300" />
+    <path d="M130 300 L270 300" />
+    <!-- Engine Hood & Exhaust -->
+    <path d="M240 240 L410 240 L410 330 L270 330" />
+    <path d="M360 170 L360 240" />
+    <!-- Front Wheel -->
+    <circle cx="370" cy="360" r="46" fill="#386642" stroke="#ffffff" stroke-width="24" />
+    <circle cx="370" cy="360" r="14" fill="#ffffff" />
+    <!-- Rear Large Wheel -->
+    <circle cx="180" cy="330" r="76" fill="#386642" stroke="#ffffff" stroke-width="26" />
+    <circle cx="180" cy="330" r="22" fill="#ffffff" />
+  </g>
+</svg>

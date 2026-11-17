@@ -14,6 +14,7 @@ const safeEnv = path.posix.join(
 
 export default defineConfig({
   root: safeRoot,
+  envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
   plugins: [
     react(),
     {
