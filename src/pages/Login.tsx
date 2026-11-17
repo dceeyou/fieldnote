@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, useRef } from 'react'
 import { useNavigate, useLocation } from 'react-router-dom'
 import {
   Tractor,
@@ -30,6 +30,11 @@ export function Login() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+
+  // Input refs for clicking container to focus
+  const emailInputRef = useRef<HTMLInputElement>(null)
+  const passwordInputRef = useRef<HTMLInputElement>(null)
+  const forgotEmailInputRef = useRef<HTMLInputElement>(null)
 
   // Feedback & Loading
   const [loading, setLoading] = useState(false)
@@ -190,20 +195,25 @@ export function Login() {
                 </div>
               )}
 
-              {/* Email Field */}
+              {/* Email Field with Perfectly Aligned Flex Container */}
               <div className="space-y-1.5">
                 <label
                   htmlFor="login-email"
-                  className="block text-xs font-medium text-text"
+                  className="block text-xs font-medium text-text cursor-pointer"
+                  onClick={() => emailInputRef.current?.focus()}
                 >
                   Administrator Email <span className="text-red-500">*</span>
                 </label>
-                <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted">
-                    <Mail size={16} />
-                  </div>
+                <div
+                  onClick={() => emailInputRef.current?.focus()}
+                  className={`flex items-center w-full h-11 rounded-lg border bg-surface px-3 transition-colors focus-within:ring-2 focus-within:ring-forest-500 focus-within:border-transparent ${
+                    emailError ? 'border-red-500 focus-within:ring-red-500' : 'border-border'
+                  }`}
+                >
+                  <Mail size={16} className="shrink-0 text-muted pointer-events-none" />
                   <input
                     id="login-email"
+                    ref={emailInputRef}
                     type="email"
                     name="email"
                     autoComplete="username"
@@ -214,20 +224,19 @@ export function Login() {
                       if (emailError) setEmailError(null)
                     }}
                     placeholder="admin@agriflow.app"
-                    className={`w-full rounded-lg border bg-surface py-2.5 pr-3 pl-9 text-sm text-text placeholder:text-muted transition-colors focus:outline-none focus:ring-2 focus:ring-forest-500 ${
-                      emailError ? 'border-red-500 focus:ring-red-500' : 'border-border'
-                    }`}
+                    className="w-full bg-transparent h-full px-2.5 text-sm text-text placeholder:text-muted border-0 outline-none focus:outline-none focus:ring-0"
                   />
                 </div>
                 {emailError && <p className="text-xs text-red-500">{emailError}</p>}
               </div>
 
-              {/* Password Field */}
+              {/* Password Field with Perfectly Aligned Flex Container & Eye Toggle */}
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <label
                     htmlFor="login-password"
-                    className="block text-xs font-medium text-text"
+                    className="block text-xs font-medium text-text cursor-pointer"
+                    onClick={() => passwordInputRef.current?.focus()}
                   >
                     Password <span className="text-red-500">*</span>
                   </label>
@@ -243,12 +252,16 @@ export function Login() {
                     Forgot password?
                   </button>
                 </div>
-                <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted">
-                    <Lock size={16} />
-                  </div>
+                <div
+                  onClick={() => passwordInputRef.current?.focus()}
+                  className={`flex items-center w-full h-11 rounded-lg border bg-surface px-3 transition-colors focus-within:ring-2 focus-within:ring-forest-500 focus-within:border-transparent ${
+                    passwordError ? 'border-red-500 focus-within:ring-red-500' : 'border-border'
+                  }`}
+                >
+                  <Lock size={16} className="shrink-0 text-muted pointer-events-none" />
                   <input
                     id="login-password"
+                    ref={passwordInputRef}
                     type={showPassword ? 'text' : 'password'}
                     name="password"
                     autoComplete="current-password"
@@ -259,15 +272,17 @@ export function Login() {
                       if (passwordError) setPasswordError(null)
                     }}
                     placeholder="••••••••••••"
-                    className={`w-full rounded-lg border bg-surface py-2.5 pr-10 pl-9 text-sm text-text placeholder:text-muted transition-colors focus:outline-none focus:ring-2 focus:ring-forest-500 ${
-                      passwordError ? 'border-red-500 focus:ring-red-500' : 'border-border'
-                    }`}
+                    className="w-full bg-transparent h-full px-2.5 text-sm text-text placeholder:text-muted border-0 outline-none focus:outline-none focus:ring-0"
                   />
                   <button
                     type="button"
+                    tabIndex={-1}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted hover:text-text transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowPassword(!showPassword)
+                    }}
+                    className="shrink-0 p-1 rounded-md text-muted hover:text-text focus:outline-none transition-colors"
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -303,7 +318,7 @@ export function Login() {
                     setErrorMessage(null)
                     setSuccessMessage(null)
                   }}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-text mb-2 transition-colors"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-muted hover:text-text mb-2 transition-colors cursor-pointer"
                 >
                   <ArrowLeft size={14} />
                   <span>Back to Sign In</span>
@@ -338,20 +353,25 @@ export function Login() {
                 </div>
               )}
 
-              {/* Email Field */}
+              {/* Email Field with Perfectly Aligned Flex Container */}
               <div className="space-y-1.5">
                 <label
                   htmlFor="forgot-email"
-                  className="block text-xs font-medium text-text"
+                  className="block text-xs font-medium text-text cursor-pointer"
+                  onClick={() => forgotEmailInputRef.current?.focus()}
                 >
                   Administrator Email <span className="text-red-500">*</span>
                 </label>
-                <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted">
-                    <Mail size={16} />
-                  </div>
+                <div
+                  onClick={() => forgotEmailInputRef.current?.focus()}
+                  className={`flex items-center w-full h-11 rounded-lg border bg-surface px-3 transition-colors focus-within:ring-2 focus-within:ring-forest-500 focus-within:border-transparent ${
+                    emailError ? 'border-red-500 focus-within:ring-red-500' : 'border-border'
+                  }`}
+                >
+                  <Mail size={16} className="shrink-0 text-muted pointer-events-none" />
                   <input
                     id="forgot-email"
+                    ref={forgotEmailInputRef}
                     type="email"
                     name="email"
                     autoComplete="username"
@@ -362,9 +382,7 @@ export function Login() {
                       if (emailError) setEmailError(null)
                     }}
                     placeholder="admin@agriflow.app"
-                    className={`w-full rounded-lg border bg-surface py-2.5 pr-3 pl-9 text-sm text-text placeholder:text-muted transition-colors focus:outline-none focus:ring-2 focus:ring-forest-500 ${
-                      emailError ? 'border-red-500 focus:ring-red-500' : 'border-border'
-                    }`}
+                    className="w-full bg-transparent h-full px-2.5 text-sm text-text placeholder:text-muted border-0 outline-none focus:outline-none focus:ring-0"
                   />
                 </div>
                 {emailError && <p className="text-xs text-red-500">{emailError}</p>}

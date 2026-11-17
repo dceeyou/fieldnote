@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type FormEvent, useRef } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import {
   Tractor,
@@ -26,6 +26,9 @@ export function ResetPassword() {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+
+  const passwordInputRef = useRef<HTMLInputElement>(null)
+  const confirmPasswordInputRef = useRef<HTMLInputElement>(null)
 
   const [loading, setLoading] = useState(false)
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -179,16 +182,21 @@ export function ResetPassword() {
               <div className="space-y-1.5">
                 <label
                   htmlFor="new-password"
-                  className="block text-xs font-medium text-text"
+                  className="block text-xs font-medium text-text cursor-pointer"
+                  onClick={() => passwordInputRef.current?.focus()}
                 >
                   New Password <span className="text-red-500">*</span>
                 </label>
-                <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted">
-                    <Lock size={16} />
-                  </div>
+                <div
+                  onClick={() => passwordInputRef.current?.focus()}
+                  className={`flex items-center w-full h-11 rounded-lg border bg-surface px-3 transition-colors focus-within:ring-2 focus-within:ring-forest-500 focus-within:border-transparent ${
+                    passwordError ? 'border-red-500 focus-within:ring-red-500' : 'border-border'
+                  }`}
+                >
+                  <Lock size={16} className="shrink-0 text-muted pointer-events-none" />
                   <input
                     id="new-password"
+                    ref={passwordInputRef}
                     type={showPassword ? 'text' : 'password'}
                     name="password"
                     autoComplete="new-password"
@@ -199,15 +207,17 @@ export function ResetPassword() {
                       if (passwordError) setPasswordError(null)
                     }}
                     placeholder="At least 6 characters"
-                    className={`w-full rounded-lg border bg-surface py-2.5 pr-10 pl-9 text-sm text-text placeholder:text-muted transition-colors focus:outline-none focus:ring-2 focus:ring-forest-500 ${
-                      passwordError ? 'border-red-500 focus:ring-red-500' : 'border-border'
-                    }`}
+                    className="w-full bg-transparent h-full px-2.5 text-sm text-text placeholder:text-muted border-0 outline-none focus:outline-none focus:ring-0"
                   />
                   <button
                     type="button"
+                    tabIndex={-1}
                     aria-label={showPassword ? 'Hide password' : 'Show password'}
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted hover:text-text transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowPassword(!showPassword)
+                    }}
+                    className="shrink-0 p-1 rounded-md text-muted hover:text-text focus:outline-none transition-colors"
                   >
                     {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
@@ -219,16 +229,21 @@ export function ResetPassword() {
               <div className="space-y-1.5">
                 <label
                   htmlFor="confirm-password"
-                  className="block text-xs font-medium text-text"
+                  className="block text-xs font-medium text-text cursor-pointer"
+                  onClick={() => confirmPasswordInputRef.current?.focus()}
                 >
                   Confirm Password <span className="text-red-500">*</span>
                 </label>
-                <div className="relative">
-                  <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted">
-                    <Lock size={16} />
-                  </div>
+                <div
+                  onClick={() => confirmPasswordInputRef.current?.focus()}
+                  className={`flex items-center w-full h-11 rounded-lg border bg-surface px-3 transition-colors focus-within:ring-2 focus-within:ring-forest-500 focus-within:border-transparent ${
+                    confirmError ? 'border-red-500 focus-within:ring-red-500' : 'border-border'
+                  }`}
+                >
+                  <Lock size={16} className="shrink-0 text-muted pointer-events-none" />
                   <input
                     id="confirm-password"
+                    ref={confirmPasswordInputRef}
                     type={showConfirmPassword ? 'text' : 'password'}
                     name="confirmPassword"
                     autoComplete="new-password"
@@ -239,15 +254,17 @@ export function ResetPassword() {
                       if (confirmError) setConfirmError(null)
                     }}
                     placeholder="Repeat new password"
-                    className={`w-full rounded-lg border bg-surface py-2.5 pr-10 pl-9 text-sm text-text placeholder:text-muted transition-colors focus:outline-none focus:ring-2 focus:ring-forest-500 ${
-                      confirmError ? 'border-red-500 focus:ring-red-500' : 'border-border'
-                    }`}
+                    className="w-full bg-transparent h-full px-2.5 text-sm text-text placeholder:text-muted border-0 outline-none focus:outline-none focus:ring-0"
                   />
                   <button
                     type="button"
+                    tabIndex={-1}
                     aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
-                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted hover:text-text transition-colors"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      setShowConfirmPassword(!showConfirmPassword)
+                    }}
+                    className="shrink-0 p-1 rounded-md text-muted hover:text-text focus:outline-none transition-colors"
                   >
                     {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
                   </button>
