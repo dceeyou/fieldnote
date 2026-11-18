@@ -153,13 +153,22 @@ describe('Database Security & RLS Migration Hardening', () => {
 
     for (const table of requiredTables) {
       assert.ok(
-        sqlContent.includes(`alter table public.${table} enable row level security`),
+        executableSql.includes(`ALTER TABLE public.${table} ENABLE ROW LEVEL SECURITY`),
         `Table ${table} must have RLS enabled`
       )
       assert.ok(
-        sqlContent.includes(`on public.${table} for all to authenticated`) &&
-        sqlContent.includes(`(select auth.uid()) is not null`),
-        `Table ${table} must use initPlan auth.uid() authenticated policy`
+        executableSql.includes(`DROP POLICY IF EXISTS "Allow all operations on ${table}" ON public.${table}`),
+        `Table ${table} must drop legacy permissive {public} policy`
+      )
+      for (const cmd of ['select', 'insert', 'update', 'delete']) {
+        assert.ok(
+          executableSql.includes(`CREATE POLICY "admin_${cmd}_${table}" ON public.${table}`),
+          `Table ${table} must define granular admin_${cmd}_${table} policy`
+        )
+      }
+      assert.ok(
+        executableSql.includes(`(SELECT auth.uid()) =`),
+        `Table ${table} must enforce initPlan auth.uid() administrator pinning`
       )
     }
   })
