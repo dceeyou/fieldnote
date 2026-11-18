@@ -55,7 +55,7 @@ import {
 } from '../utils/date.ts'
 
 export function Transactions() {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const initialType = (searchParams.get('type') as 'income' | 'expense') || 'all'
   const initialLand = searchParams.get('landId') || 'all'
   const initialCrop = searchParams.get('cropId') || 'all'
@@ -66,6 +66,7 @@ export function Transactions() {
   const [lands, setLands] = useState<LandWithCrops[]>([])
   const [crops, setCrops] = useState<Crop[]>([])
   const [categories, setCategories] = useState<Category[]>([])
+  const [metadataLoaded, setMetadataLoaded] = useState(false)
   const [loading, setLoading] = useState(true)
 
   // Filters State
@@ -117,10 +118,15 @@ export function Transactions() {
   const [defaultImportLandId, setDefaultImportLandId] = useState('')
   const [isImporting, setIsImporting] = useState(false)
 
-  // Bulk Selection State
+  // Bulk Selection & Accessible Delete Confirmation State
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [bulkDeleteSuccess, setBulkDeleteSuccess] = useState<string | null>(null)
   const [isBulkDeleting, setIsBulkDeleting] = useState(false)
+  const [deleteConfirm, setDeleteConfirm] = useState<
+    | { mode: 'single'; id: string; description: string }
+    | { mode: 'bulk'; ids: string[] }
+    | null
+  >(null)
 
   // Export State
   const [isExportModalOpen, setIsExportModalOpen] = useState(false)
@@ -139,6 +145,7 @@ export function Transactions() {
     setLands(allLands)
     setCrops(allCrops)
     setCategories(allCats)
+    setMetadataLoaded(true)
   }
 
   async function loadTransactions() {
@@ -226,6 +233,16 @@ export function Transactions() {
     setDismissedSuggestionForDesc(null)
     setIsModalOpen(true)
   }
+
+  // Handle mobile FAB & Quick Actions deep link (?action=add)
+  useEffect(() => {
+    if (metadataLoaded && searchParams.get('action') === 'add') {
+      openAddModal()
+      const next = new URLSearchParams(searchParams)
+      next.delete('action')
+      setSearchParams(next, { replace: true })
+    }
+  }, [metadataLoaded, searchParams])
 
   function openEditModal(tx: Transaction) {
     setEditingTx(tx)
@@ -336,44 +353,41 @@ export function Transactions() {
     setSelectedIds(new Set())
   }
 
-  async function handleBulkDelete() {
-    const count = selectedIds.size
-    if (count === 0) return
+  function handleBulkDelete() {
+    const ids = Array.from(selectedIds)
+    if (ids.length === 0) return
+    setDeleteConfirm({ mode: 'bulk', ids })
+  }
 
-    if (
-      !window.confirm(
-        `Are you sure you want to delete ${count} selected transaction${
-          count > 1 ? 's' : ''
-        }? This action cannot be undone.`
-      )
-    ) {
-      return
-    }
+  function handleDelete(id: string, desc: string) {
+    setDeleteConfirm({ mode: 'single', id, description: desc })
+  }
 
+  async function executeConfirmedDelete() {
+    if (!deleteConfirm) return
     setIsBulkDeleting(true)
     setBulkDeleteSuccess(null)
     try {
-      await bulkDeleteTransactions(Array.from(selectedIds))
-      setSelectedIds(new Set())
-      setBulkDeleteSuccess(`Successfully deleted ${count} transaction${count > 1 ? 's' : ''}.`)
+      if (deleteConfirm.mode === 'bulk') {
+        const count = deleteConfirm.ids.length
+        await bulkDeleteTransactions(deleteConfirm.ids)
+        setSelectedIds(new Set())
+        setBulkDeleteSuccess(`Successfully deleted ${count} transaction${count > 1 ? 's' : ''}.`)
+      } else {
+        await deleteTransaction(deleteConfirm.id)
+        setSelectedIds((prev) => {
+          if (prev.has(deleteConfirm.id)) {
+            const next = new Set(prev)
+            next.delete(deleteConfirm.id)
+            return next
+          }
+          return prev
+        })
+      }
+      setDeleteConfirm(null)
       await loadTransactions()
     } finally {
       setIsBulkDeleting(false)
-    }
-  }
-
-  async function handleDelete(id: string, desc: string) {
-    if (window.confirm(`Delete transaction "${desc}"? This action cannot be undone.`)) {
-      await deleteTransaction(id)
-      setSelectedIds((prev) => {
-        if (prev.has(id)) {
-          const next = new Set(prev)
-          next.delete(id)
-          return next
-        }
-        return prev
-      })
-      await loadTransactions()
     }
   }
 
@@ -707,7 +721,7 @@ export function Transactions() {
                   onClick={() => setDatePreset(preset.id)}
                   className={`rounded-md px-2.5 py-1 text-xs font-medium transition-all ${
                     datePreset === preset.id
-                      ? 'bg-surface text-text shadow-xs font-semibold'
+                      ? 'bg-surface text-text shadow-sm font-semibold'
                       : 'text-muted hover:text-text'
                   }`}
                 >
@@ -742,7 +756,7 @@ export function Transactions() {
 
       {/* Bulk Action Bar */}
       {selectedIds.size > 0 && (
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-forest-300 bg-forest-50/90 p-3.5 text-xs text-forest-900 shadow-xs dark:border-forest-700/60 dark:bg-forest-950/80 dark:text-forest-100">
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 rounded-xl border border-forest-300 bg-forest-50/90 p-3.5 text-xs text-forest-900 shadow-sm dark:border-forest-700/60 dark:bg-forest-950/80 dark:text-forest-100">
           <div className="flex flex-wrap items-center gap-2">
             <span className="grid size-6 place-items-center rounded-md bg-forest-600 text-white font-bold text-xs">
               {selectedIds.size}
@@ -808,9 +822,91 @@ export function Transactions() {
             </div>
           </Card>
         ) : (
-          <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-sm">
+          <>
+            {/* Mobile Card List View (< 640px) */}
+            <div className="space-y-3 sm:hidden">
+              {transactions.map((tx) => {
+                const isIncome = tx.type === 'income'
+                const isSelected = selectedIds.has(tx.id)
+                return (
+                  <Card
+                    key={tx.id}
+                    className={`p-4 transition-colors ${
+                      isSelected ? 'border-forest-500 bg-forest-50/50 dark:bg-forest-950/30' : ''
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-2.5">
+                      <div className="flex items-start gap-2.5 min-w-0">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(tx.id)}
+                          aria-label={`Select transaction ${tx.description}`}
+                          className="mt-1 size-4 shrink-0 rounded border-border text-forest-600 focus:ring-forest-500 cursor-pointer"
+                        />
+                        <div className="min-w-0">
+                          <p className="font-semibold text-sm text-text leading-snug break-words">
+                            {tx.description}
+                          </p>
+                          <p className="mt-0.5 text-xs text-muted">
+                            {formatDateDisplay(tx.date)} · {categoryMap.get(tx.categoryId) || 'Uncategorized'}
+                          </p>
+                        </div>
+                      </div>
+                      <span
+                        className={`shrink-0 text-sm font-bold tabular-nums ${
+                          isIncome ? 'text-forest-600 dark:text-forest-400' : 'text-amber-700 dark:text-amber-400'
+                        }`}
+                      >
+                        {isIncome ? '+' : '-'} {formatLKR(tx.amount)}
+                      </span>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2.5">
+                      <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                        <span className="rounded-md bg-subtle px-2 py-0.5 font-medium text-text">
+                          {landMap.get(tx.landId) || 'Unknown land'}
+                        </span>
+                        {tx.cropId && cropMap.get(tx.cropId) && (
+                          <span className="rounded-md bg-forest-50 px-2 py-0.5 font-medium text-forest-700 dark:bg-forest-900/40 dark:text-forest-200">
+                            {cropMap.get(tx.cropId)}
+                          </span>
+                        )}
+                        {tx.referenceNumber && (
+                          <span className="text-muted">Ref: {tx.referenceNumber}</span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-10"
+                          aria-label={`Edit transaction ${tx.description}`}
+                          onClick={() => openEditModal(tx)}
+                        >
+                          <Edit2 size={15} />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-10 hover:text-red-500"
+                          aria-label={`Delete transaction ${tx.description}`}
+                          onClick={() => handleDelete(tx.id, tx.description)}
+                        >
+                          <Trash2 size={15} />
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+
+            {/* Desktop Table View (>= 640px) */}
+            <Card className="hidden sm:block overflow-hidden">
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
                 <thead className="border-b border-border bg-subtle/50 text-xs font-semibold text-muted uppercase tracking-wider">
                   <tr>
                     <th className="py-3 px-3 w-10 text-center">
@@ -914,6 +1010,7 @@ export function Transactions() {
               </table>
             </div>
           </Card>
+          </>
         )}
       </div>
 
@@ -942,7 +1039,7 @@ export function Transactions() {
               }}
               className={`flex-1 rounded-md py-1.5 text-xs font-semibold transition-all ${
                 txType === 'expense'
-                  ? 'bg-amber-600 text-white shadow-xs'
+                  ? 'bg-amber-600 text-white shadow-sm'
                   : 'text-muted hover:text-text'
               }`}
             >
@@ -957,7 +1054,7 @@ export function Transactions() {
               }}
               className={`flex-1 rounded-md py-1.5 text-xs font-semibold transition-all ${
                 txType === 'income'
-                  ? 'bg-forest-600 text-white shadow-xs'
+                  ? 'bg-forest-600 text-white shadow-sm'
                   : 'text-muted hover:text-text'
               }`}
             >
@@ -965,7 +1062,7 @@ export function Transactions() {
             </button>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <DatePicker
               label="Transaction Date"
               value={txDate}
@@ -975,6 +1072,7 @@ export function Transactions() {
             <Input
               label="Amount in LKR"
               type="number"
+              inputMode="decimal"
               step="any"
               placeholder="0.00"
               value={txAmount}
@@ -1008,7 +1106,7 @@ export function Transactions() {
             </p>
           </div>
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {/* Optional Crop Selection */}
             <Select
               label="Associated Crop (Optional)"
@@ -1273,6 +1371,47 @@ export function Transactions() {
               {isImporting
                 ? 'Importing...'
                 : `Confirm & Import ${stagedRows.filter((r) => r.isValid && r.landId).length} Rows`}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Accessible Delete Confirmation Modal (replaces native window.confirm) */}
+      <Modal
+        isOpen={Boolean(deleteConfirm)}
+        onClose={() => !isBulkDeleting && setDeleteConfirm(null)}
+        title={
+          deleteConfirm?.mode === 'bulk'
+            ? `Delete ${deleteConfirm.ids.length} Transactions`
+            : 'Delete Transaction'
+        }
+        description="This action permanently removes the selected financial record(s) and cannot be undone."
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm text-text">
+            {deleteConfirm?.mode === 'bulk'
+              ? `Are you sure you want to permanently delete ${deleteConfirm.ids.length} selected transaction${
+                  deleteConfirm.ids.length > 1 ? 's' : ''
+                }?`
+              : `Are you sure you want to delete "${deleteConfirm?.description || ''}"?`}
+          </p>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="secondary"
+              onClick={() => setDeleteConfirm(null)}
+              disabled={isBulkDeleting}
+            >
+              Cancel
+            </Button>
+            <Button
+              type="button"
+              onClick={executeConfirmedDelete}
+              disabled={isBulkDeleting}
+              className="bg-red-600 hover:bg-red-700 text-white"
+            >
+              {isBulkDeleting ? 'Deleting...' : 'Delete Permanently'}
             </Button>
           </div>
         </div>

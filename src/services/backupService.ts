@@ -50,7 +50,7 @@ export async function createBackupPayload(): Promise<BackupPayload> {
 
   return {
     version: 1,
-    appName: 'Fieldnote - Agriculture Management',
+    appName: 'AgriFlow - Agriculture Management',
     exportedAt: new Date().toISOString(),
     data: {
       lands,
@@ -73,7 +73,7 @@ export async function downloadBackup(): Promise<string> {
 
   const a = document.createElement('a')
   a.href = url
-  a.download = `fieldnote-backup-${getTodayColombo()}.json`
+  a.download = `agriflow-backup-${getTodayColombo()}.json`
   document.body.appendChild(a)
   a.click()
   document.body.removeChild(a)
@@ -125,6 +125,7 @@ export async function restoreFromBackup(payload: BackupPayload): Promise<void> {
     db.fertilizers,
     db.fertilizerApplications,
     db.settings,
+    db.syncDeletions,
   ]
 
   await db.transaction('rw', tables, async () => {

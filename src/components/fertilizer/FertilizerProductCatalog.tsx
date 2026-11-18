@@ -242,7 +242,7 @@ export function FertilizerProductCatalog({
           {fertilizers.map((fert) => (
             <Card
               key={fert.id}
-              className="flex items-start justify-between p-4 transition-all hover:border-forest-600/40 hover:shadow-xs"
+              className="flex items-start justify-between p-4 transition-all hover:border-forest-600/40 hover:shadow-sm"
             >
               <div className="flex items-start gap-3 min-w-0 flex-1">
                 <div className="grid size-9 shrink-0 place-items-center rounded-lg bg-forest-50 text-forest-700 dark:bg-forest-700/20 dark:text-forest-200">

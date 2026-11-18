@@ -272,7 +272,7 @@ export function CategoryManagement({
               onClick={() => setActiveTab('expense')}
               className={`rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors ${
                 activeTab === 'expense'
-                  ? 'bg-forest-600 text-white shadow-xs font-semibold'
+                  ? 'bg-forest-600 text-white shadow-sm font-semibold'
                   : 'border border-border bg-canvas text-text hover:bg-subtle'
               }`}
             >
@@ -283,7 +283,7 @@ export function CategoryManagement({
               onClick={() => setActiveTab('income')}
               className={`rounded-lg px-3.5 py-1.5 text-xs font-medium transition-colors ${
                 activeTab === 'income'
-                  ? 'bg-forest-600 text-white shadow-xs font-semibold'
+                  ? 'bg-forest-600 text-white shadow-sm font-semibold'
                   : 'border border-border bg-canvas text-text hover:bg-subtle'
               }`}
             >

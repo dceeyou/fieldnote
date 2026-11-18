@@ -14,7 +14,7 @@ export function GuestRoute({ children }: { children?: ReactNode }) {
           <div className="grid size-16 place-items-center rounded-2xl bg-forest-600 text-white shadow-lg shadow-forest-600/20">
             <Tractor size={32} />
           </div>
-          <div className="absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full bg-surface border border-border shadow-xs text-forest-600">
+          <div className="absolute -bottom-1 -right-1 grid size-6 place-items-center rounded-full bg-surface border border-border shadow-sm text-forest-600">
             <Loader2 size={14} className="animate-spin" />
           </div>
         </div>

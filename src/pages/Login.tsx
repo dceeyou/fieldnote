@@ -123,7 +123,7 @@ export function Login() {
           size="icon"
           aria-label="Change theme"
           onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')}
-          className="rounded-full bg-surface border border-border shadow-xs"
+          className="rounded-full bg-surface border border-border shadow-sm"
         >
           {theme === 'dark' ? <Sun size={18} /> : <Moon size={18} />}
         </Button>

@@ -61,7 +61,7 @@ export function CategorySuggestionBadge({
         <button
           type="button"
           onClick={() => onAccept(suggestion.categoryId)}
-          className="flex items-center gap-1 rounded-md bg-forest-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-xs hover:bg-forest-700 transition-colors"
+          className="flex items-center gap-1 rounded-md bg-forest-600 px-2.5 py-1 text-[11px] font-semibold text-white shadow-sm hover:bg-forest-700 transition-colors"
         >
           <Check size={12} />
           <span>Accept</span>

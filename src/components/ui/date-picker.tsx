@@ -438,7 +438,7 @@ export function DatePicker({
               } else if (cell.isSelected) {
                 // Forest green selection (#356B45)
                 cellClasses +=
-                  'bg-forest-600 text-white font-semibold shadow-xs hover:bg-forest-700 '
+                  'bg-forest-600 text-white font-semibold shadow-sm hover:bg-forest-700 '
               } else if (cell.isToday) {
                 cellClasses +=
                   'ring-1 ring-forest-500 font-semibold text-forest-700 dark:text-forest-300 hover:bg-subtle '

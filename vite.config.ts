@@ -1,6 +1,48 @@
+import fs from 'node:fs'
 import path from 'node:path'
-import { defineConfig } from 'vite'
+import { defineConfig, type Plugin } from 'vite'
 import react from '@vitejs/plugin-react'
+
+function injectPwaPrecacheAssets(): Plugin {
+  return {
+    name: 'agriflow-sw-precache',
+    apply: 'build',
+    closeBundle() {
+      const distDir = path.resolve(safeRoot, 'dist')
+      const indexPath = path.join(distDir, 'index.html')
+      const swPath = path.join(distDir, 'sw.js')
+      if (!fs.existsSync(indexPath) || !fs.existsSync(swPath)) return
+
+      const html = fs.readFileSync(indexPath, 'utf8')
+      const assets = new Set<string>()
+      const attrRegex = /(?:src|href)="(\/assets\/[^"]+)"/g
+      let match: RegExpExecArray | null
+      while ((match = attrRegex.exec(html)) !== null) {
+        assets.add(match[1])
+      }
+
+      if (assets.size === 0) return
+      const buildHash = Array.from(assets)
+        .map((a) => path.basename(a))
+        .join('-')
+        .replace(/[^a-zA-Z0-9_-]/g, '')
+        .slice(0, 24)
+
+      let swCode = fs.readFileSync(swPath, 'utf8')
+      const injectedList = Array.from(assets)
+        .map((a) => `  '${a}',`)
+        .join('\n')
+      swCode = swCode.replace('  /* __PRECACHE_ASSETS__ */', injectedList)
+      if (buildHash) {
+        swCode = swCode.replace(
+          /const CACHE_NAME = 'agriflow-cache-[^']+'/,
+          `const CACHE_NAME = 'agriflow-cache-${buildHash}'`
+        )
+      }
+      fs.writeFileSync(swPath, swCode, 'utf8')
+    },
+  }
+}
 
 const safeRoot = process.env.PWD ?? process.cwd()
 const safeClient = path.posix.join(
@@ -17,6 +59,7 @@ export default defineConfig({
   envPrefix: ['VITE_', 'NEXT_PUBLIC_'],
   plugins: [
     react(),
+    injectPwaPrecacheAssets(),
     {
       name: 'client-inject-substitute',
       transform(code, id) {

@@ -106,7 +106,7 @@ export function Dashboard() {
         </div>
 
         {/* Global Filters Control Bar */}
-        <div className="rounded-xl border border-border bg-surface p-4 shadow-xs space-y-3">
+        <div className="rounded-xl border border-border bg-surface p-4 shadow-sm space-y-3">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-muted">
               <Filter size={14} className="text-forest-600" />
@@ -152,7 +152,7 @@ export function Dashboard() {
                     onClick={() => setDatePreset(key)}
                     className={`rounded-lg px-2.5 py-1.5 text-xs font-medium transition-colors ${
                       datePreset === key
-                        ? 'bg-forest-600 text-white shadow-xs'
+                        ? 'bg-forest-600 text-white shadow-sm'
                         : 'border border-border bg-canvas text-text hover:bg-subtle'
                     }`}
                   >

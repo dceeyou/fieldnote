@@ -91,12 +91,23 @@ if (typeof window !== 'undefined' && 'serviceWorker' in navigator && window.loca
     navigator.serviceWorker
       .register('/sw.js')
       .then((registration) => {
+        const notifyUpdate = () => {
+          window.dispatchEvent(
+            new CustomEvent('agriflow-sw-update', { detail: { registration } })
+          )
+        }
+
+        // If an updated worker is already waiting from a previous visit
+        if (registration.waiting && navigator.serviceWorker.controller) {
+          notifyUpdate()
+        }
+
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing
           if (newWorker) {
             newWorker.addEventListener('statechange', () => {
               if (newWorker.state === 'installed' && navigator.serviceWorker.controller) {
-                console.log('AgriFlow updated. Refresh to apply latest version.')
+                notifyUpdate()
               }
             })
           }

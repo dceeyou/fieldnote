@@ -304,10 +304,11 @@ export function CultivationAreas() {
             onChange={(e) => setLocation(e.target.value)}
           />
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Input
               label="Area Size"
               type="number"
+              inputMode="decimal"
               step="any"
               placeholder="e.g. 2.5 or 80"
               value={areaValue}

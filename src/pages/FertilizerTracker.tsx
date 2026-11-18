@@ -48,7 +48,7 @@ import { getFertilizerDueStatus } from '../utils/reminders.ts'
 import { formatLKR } from '../utils/calculations.ts'
 
 export function FertilizerTracker() {
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const tabParam = searchParams.get('tab')
   const [activeTab, setActiveTab] = useState<'applications' | 'products'>(
     tabParam === 'products' ? 'products' : 'applications'
@@ -58,6 +58,7 @@ export function FertilizerTracker() {
   const [lands, setLands] = useState<LandWithCrops[]>([])
   const [crops, setCrops] = useState<Crop[]>([])
   const [fertilizers, setFertilizers] = useState<Fertilizer[]>([])
+  const [metadataLoaded, setMetadataLoaded] = useState(false)
   const [loading, setLoading] = useState(true)
 
   // Filters
@@ -106,6 +107,7 @@ export function FertilizerTracker() {
     setLands(allLands)
     setCrops(allCrops)
     setFertilizers(allFerts)
+    setMetadataLoaded(true)
   }
 
   async function loadApplications() {
@@ -223,6 +225,17 @@ export function FertilizerTracker() {
     setFormError(null)
     setIsAddModalOpen(true)
   }
+
+  // Handle Quick Actions deep link (?action=add)
+  useEffect(() => {
+    if (metadataLoaded && searchParams.get('action') === 'add') {
+      setActiveTab('applications')
+      openAddModal()
+      const next = new URLSearchParams(searchParams)
+      next.delete('action')
+      setSearchParams(next, { replace: true })
+    }
+  }, [metadataLoaded, searchParams])
 
   function openEditModal(app: FertilizerApplication) {
     setEditingApp(app)
@@ -468,61 +481,61 @@ export function FertilizerTracker() {
       ) : (
         <>
           {/* Reminder Metric Cards */}
-      <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="mt-6 grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
         <Card
           onClick={() => setStatusFilter('overdue')}
-          className={`p-4 cursor-pointer transition-all hover:border-red-400 ${
+          className={`p-3.5 sm:p-4 cursor-pointer transition-all hover:border-red-400 ${
             statusFilter === 'overdue' ? 'ring-2 ring-red-500' : ''
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted uppercase tracking-wider">Overdue</span>
-            <AlertTriangle size={18} className="text-red-500" />
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] sm:text-xs font-medium text-muted uppercase tracking-wider truncate">Overdue</span>
+            <AlertTriangle size={17} className="shrink-0 text-red-500" />
           </div>
-          <p className="mt-3 text-2xl font-bold text-red-600">{counts.overdue}</p>
-          <p className="text-xs text-muted mt-1">Requires immediate attention</p>
+          <p className="mt-2 sm:mt-3 text-xl sm:text-2xl font-bold text-red-600">{counts.overdue}</p>
+          <p className="text-[11px] sm:text-xs text-muted mt-1">Immediate attention</p>
         </Card>
 
         <Card
           onClick={() => setStatusFilter('due_today')}
-          className={`p-4 cursor-pointer transition-all hover:border-amber-400 ${
+          className={`p-3.5 sm:p-4 cursor-pointer transition-all hover:border-amber-400 ${
             statusFilter === 'due_today' ? 'ring-2 ring-amber-500' : ''
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted uppercase tracking-wider">Due Today</span>
-            <Clock size={18} className="text-amber-500" />
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] sm:text-xs font-medium text-muted uppercase tracking-wider truncate">Due Today</span>
+            <Clock size={17} className="shrink-0 text-amber-500" />
           </div>
-          <p className="mt-3 text-2xl font-bold text-amber-600">{counts.dueToday}</p>
-          <p className="text-xs text-muted mt-1">Scheduled for today</p>
+          <p className="mt-2 sm:mt-3 text-xl sm:text-2xl font-bold text-amber-600">{counts.dueToday}</p>
+          <p className="text-[11px] sm:text-xs text-muted mt-1">Scheduled today</p>
         </Card>
 
         <Card
           onClick={() => setStatusFilter('due_soon')}
-          className={`p-4 cursor-pointer transition-all hover:border-amber-300 ${
+          className={`p-3.5 sm:p-4 cursor-pointer transition-all hover:border-amber-300 ${
             statusFilter === 'due_soon' ? 'ring-2 ring-amber-400' : ''
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted uppercase tracking-wider">Due Soon</span>
-            <Calendar size={18} className="text-forest-600" />
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] sm:text-xs font-medium text-muted uppercase tracking-wider truncate">Due Soon</span>
+            <Calendar size={17} className="shrink-0 text-forest-600" />
           </div>
-          <p className="mt-3 text-2xl font-bold text-forest-700 dark:text-forest-300">{counts.dueSoon}</p>
-          <p className="text-xs text-muted mt-1">Within next 7 calendar days</p>
+          <p className="mt-2 sm:mt-3 text-xl sm:text-2xl font-bold text-forest-700 dark:text-forest-300">{counts.dueSoon}</p>
+          <p className="text-[11px] sm:text-xs text-muted mt-1">Next 7 days</p>
         </Card>
 
         <Card
           onClick={() => setStatusFilter('completed')}
-          className={`p-4 cursor-pointer transition-all hover:border-forest-400 ${
+          className={`p-3.5 sm:p-4 cursor-pointer transition-all hover:border-forest-400 ${
             statusFilter === 'completed' ? 'ring-2 ring-forest-500' : ''
           }`}
         >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-muted uppercase tracking-wider">Completed</span>
-            <CheckCircle2 size={18} className="text-forest-600" />
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[11px] sm:text-xs font-medium text-muted uppercase tracking-wider truncate">Completed</span>
+            <CheckCircle2 size={17} className="shrink-0 text-forest-600" />
           </div>
-          <p className="mt-3 text-2xl font-bold text-text">{counts.completed}</p>
-          <p className="text-xs text-muted mt-1">Logged past applications</p>
+          <p className="mt-2 sm:mt-3 text-xl sm:text-2xl font-bold text-text">{counts.completed}</p>
+          <p className="text-[11px] sm:text-xs text-muted mt-1">Logged history</p>
         </Card>
       </div>
 
@@ -579,7 +592,111 @@ export function FertilizerTracker() {
             </div>
           </Card>
         ) : (
-          <Card className="divide-y divide-border overflow-hidden">
+          <>
+            {/* Mobile Application Cards (< 640px) */}
+            <div className="space-y-3 sm:hidden">
+              {displayedApplications.map((app) => {
+                const isScheduled = app.status === 'scheduled'
+                return (
+                  <Card key={app.id} className="p-4 space-y-3">
+                    <div className="flex items-start justify-between gap-2">
+                      <h4 className="font-semibold text-sm text-text leading-snug">
+                        {fertMap.get(app.fertilizerId) || 'Unknown Fertilizer'}
+                      </h4>
+                      <div className="shrink-0">{renderStatusBadge(app)}</div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                      <span className="inline-flex items-center gap-1 rounded-md bg-subtle px-2 py-0.5 font-medium text-text">
+                        <MapPin size={12} className="text-muted" />
+                        {landMap.get(app.landId) || 'Unknown Land'}
+                      </span>
+                      <span className="inline-flex items-center gap-1 rounded-md bg-forest-50 px-2 py-0.5 font-medium text-forest-700 dark:bg-forest-900/40 dark:text-forest-200">
+                        <Sprout size={12} />
+                        {cropMap.get(app.cropId) || 'Unknown Crop'}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 rounded-lg bg-subtle/50 p-2.5 text-xs">
+                      <div>
+                        <span className="text-[11px] text-muted block">Applied</span>
+                        <span className="font-medium text-text">{formatDateDisplay(app.applicationDate)}</span>
+                      </div>
+                      {app.nextDueDate && (
+                        <div>
+                          <span className="text-[11px] text-muted block">Next Due</span>
+                          <span className="font-medium text-text">{formatDateDisplay(app.nextDueDate)}</span>
+                        </div>
+                      )}
+                      {app.quantity && (
+                        <div>
+                          <span className="text-[11px] text-muted block">Quantity</span>
+                          <span className="font-medium text-text">{app.quantity} {app.unit || 'kg'}</span>
+                        </div>
+                      )}
+                      {app.cost !== undefined && app.cost > 0 && (
+                        <div>
+                          <span className="text-[11px] text-muted block">Cost</span>
+                          <span className="font-medium text-text">{formatLKR(app.cost)}</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {app.notes && (
+                      <p className="text-xs text-muted italic">{app.notes}</p>
+                    )}
+
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-t border-border/60 pt-2.5">
+                      {isScheduled ? (
+                        <Button
+                          size="default"
+                          className="h-10 flex-1 px-3 text-xs bg-forest-600 hover:bg-forest-700"
+                          onClick={() => openCompleteModal(app)}
+                        >
+                          <CheckCircle2 size={15} /> Mark Completed
+                        </Button>
+                      ) : (
+                        <span className="text-xs text-muted capitalize">{app.status}</span>
+                      )}
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-10"
+                          aria-label="Edit application"
+                          onClick={() => openEditModal(app)}
+                        >
+                          <Edit2 size={15} />
+                        </Button>
+                        {isScheduled && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="size-10 hover:text-amber-600"
+                            aria-label="Cancel application"
+                            onClick={() => handleCancel(app.id)}
+                          >
+                            <XCircle size={15} />
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="size-10 hover:text-red-500"
+                          aria-label="Delete application"
+                          onClick={() => handleDelete(app.id)}
+                        >
+                          <Trash2 size={15} />
+                        </Button>
+                      </div>
+                    </div>
+                  </Card>
+                )
+              })}
+            </div>
+
+            {/* Desktop Application List (>= 640px) */}
+            <Card className="hidden sm:block divide-y divide-border overflow-hidden">
             {displayedApplications.map((app) => {
               const isScheduled = app.status === 'scheduled'
               return (
@@ -679,6 +796,7 @@ export function FertilizerTracker() {
               )
             })}
           </Card>
+          </>
         )}
       </div>
       </>
@@ -698,7 +816,7 @@ export function FertilizerTracker() {
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <Select
               label="Cultivation Land"
               value={landId}
@@ -808,10 +926,11 @@ export function FertilizerTracker() {
             </div>
           )}
 
-          <div className="grid grid-cols-3 gap-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <Input
               label="Quantity"
               type="number"
+              inputMode="decimal"
               step="any"
               placeholder="e.g. 50"
               value={quantity}
@@ -826,6 +945,7 @@ export function FertilizerTracker() {
             <Input
               label="Cost (LKR)"
               type="number"
+              inputMode="decimal"
               step="any"
               placeholder="0.00"
               value={cost}

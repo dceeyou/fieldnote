@@ -37,7 +37,7 @@ export function OfflineIndicator() {
     return (
       <aside
         aria-label="Network status notification"
-        className="sticky top-0 z-50 flex items-center justify-center gap-2 bg-emerald-600 px-4 py-1.5 text-xs font-medium text-white shadow-xs transition-all"
+        className="sticky top-0 z-50 flex items-center justify-center gap-2 bg-emerald-600 px-4 py-1.5 text-xs font-medium text-white shadow-sm transition-all"
       >
         <Wifi size={14} className="shrink-0" />
         <span>Connection restored · Back online</span>
@@ -49,7 +49,7 @@ export function OfflineIndicator() {
     return (
       <aside
         aria-label="Offline warning banner"
-        className="sticky top-0 z-50 flex items-center justify-between gap-3 border-b border-amber-500/30 bg-amber-500/15 px-4 py-2 text-xs font-medium text-amber-800 dark:text-amber-200 shadow-xs transition-all"
+        className="sticky top-0 z-50 flex items-center justify-between gap-3 border-b border-amber-500/30 bg-amber-500/15 px-4 py-2 text-xs font-medium text-amber-800 dark:text-amber-200 shadow-sm transition-all"
       >
         <div className="flex items-center gap-2">
           <WifiOff size={14} className="shrink-0 text-amber-600 dark:text-amber-400" />

@@ -164,7 +164,7 @@ export function CategoryAuditModal({
               return (
                 <div
                   key={group.groupId}
-                  className="rounded-xl border border-border bg-surface p-4 space-y-3 shadow-xs"
+                  className="rounded-xl border border-border bg-surface p-4 space-y-3 shadow-sm"
                 >
                   <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border pb-2.5">
                     <div className="flex items-center gap-2">
