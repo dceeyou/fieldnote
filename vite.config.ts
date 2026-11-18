@@ -18,11 +18,28 @@ function injectPwaPrecacheAssets(): Plugin {
       const attrRegex = /(?:src|href)="(\/assets\/[^"]+)"/g
       let match: RegExpExecArray | null
       while ((match = attrRegex.exec(html)) !== null) {
-        assets.add(match[1])
+        if (!match[1].includes('exceljs')) {
+          assets.add(match[1])
+        }
+      }
+
+      // Also precache lightweight split route chunks for offline navigation while
+      // keeping heavy on-demand ExcelJS (~940 KB) out of eager SW installation.
+      const assetsDir = path.join(distDir, 'assets')
+      if (fs.existsSync(assetsDir)) {
+        for (const fileName of fs.readdirSync(assetsDir)) {
+          if (
+            (fileName.endsWith('.js') || fileName.endsWith('.css')) &&
+            !fileName.includes('exceljs')
+          ) {
+            assets.add(`/assets/${fileName}`)
+          }
+        }
       }
 
       if (assets.size === 0) return
       const buildHash = Array.from(assets)
+        .sort()
         .map((a) => path.basename(a))
         .join('-')
         .replace(/[^a-zA-Z0-9_-]/g, '')
@@ -90,6 +107,54 @@ export default defineConfig({
       { find: /^\/?@vite\/client/, replacement: safeClient },
       { find: /^\/?@vite\/env/, replacement: safeEnv },
     ],
+  },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (!id.includes('node_modules')) return undefined
+          // Keep ExcelJS in its own dynamic chunk (loaded only when user exports .xlsx)
+          if (id.includes('exceljs')) return undefined
+          if (
+            id.includes('/react/') ||
+            id.includes('/react-dom/') ||
+            id.includes('/scheduler/') ||
+            id.includes('/react-router') ||
+            id.includes('/clsx/') ||
+            id.includes('/tailwind-merge/') ||
+            id.includes('/class-variance-authority/')
+          ) {
+            return 'vendor-react'
+          }
+          if (
+            id.includes('/recharts/') ||
+            id.includes('/d3-') ||
+            id.includes('/victory-vendor/') ||
+            id.includes('/es-toolkit/') ||
+            id.includes('/decimal.js-light/') ||
+            id.includes('/recharts-scale/')
+          ) {
+            return 'vendor-charts'
+          }
+          if (id.includes('/@supabase/')) {
+            return 'vendor-supabase'
+          }
+          if (id.includes('/dexie/')) {
+            return 'vendor-dexie'
+          }
+          if (id.includes('/zod/')) {
+            return 'vendor-zod'
+          }
+          if (id.includes('/lucide-react/')) {
+            return 'vendor-icons'
+          }
+          if (id.includes('/papaparse/')) {
+            return 'vendor-csv'
+          }
+          return undefined
+        },
+      },
+    },
   },
   server: {
     host: '0.0.0.0',

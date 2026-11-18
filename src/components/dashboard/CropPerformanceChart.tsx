@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   BarChart,
@@ -64,7 +65,9 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   return null
 }
 
-export function CropPerformanceChart({ data }: CropPerformanceChartProps) {
+export const CropPerformanceChart = memo(function CropPerformanceChart({
+  data,
+}: CropPerformanceChartProps) {
   const navigate = useNavigate()
 
   return (
@@ -167,4 +170,4 @@ export function CropPerformanceChart({ data }: CropPerformanceChartProps) {
       </p>
     </Card>
   )
-}
+})

@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import {
   BarChart,
   Bar,
@@ -73,7 +73,7 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   return null
 }
 
-export function ExpenseDistributionStackedChart({
+export const ExpenseDistributionStackedChart = memo(function ExpenseDistributionStackedChart({
   data,
   categoryNames,
 }: ExpenseDistributionStackedChartProps) {
@@ -165,4 +165,4 @@ export function ExpenseDistributionStackedChart({
       )}
     </Card>
   )
-}
+})

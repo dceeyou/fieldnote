@@ -1,3 +1,4 @@
+import { memo, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowDownLeft,
@@ -21,7 +22,7 @@ interface RecentTransactionsProps {
   categories: Category[]
 }
 
-export function RecentTransactions({
+export const RecentTransactions = memo(function RecentTransactions({
   transactions,
   lands,
   crops,
@@ -29,9 +30,9 @@ export function RecentTransactions({
 }: RecentTransactionsProps) {
   const navigate = useNavigate()
 
-  const landMap = new Map(lands.map((l) => [l.id, l.name]))
-  const cropMap = new Map(crops.map((c) => [c.id, c.name]))
-  const catMap = new Map(categories.map((c) => [c.id, c.name]))
+  const landMap = useMemo(() => new Map(lands.map((l) => [l.id, l.name])), [lands])
+  const cropMap = useMemo(() => new Map(crops.map((c) => [c.id, c.name])), [crops])
+  const catMap = useMemo(() => new Map(categories.map((c) => [c.id, c.name])), [categories])
 
   return (
     <Card className="p-4 sm:p-6 flex flex-col justify-between">
@@ -200,4 +201,4 @@ export function RecentTransactions({
       </div>
     </Card>
   )
-}
+})

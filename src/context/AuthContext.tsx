@@ -7,12 +7,6 @@ import {
   secureSessionStorage,
   getSupabaseAuthStorageKey,
 } from '../lib/supabase.ts'
-import {
-  loginSchema,
-  resetPasswordRequestSchema,
-  updatePasswordSchema,
-  formatAuthError,
-} from '../domain/validation.ts'
 
 export interface AuthContextValue {
   user: User | null
@@ -92,6 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   async function login(email: string, password: string): Promise<{ success: boolean; error?: string }> {
+    const { loginSchema, formatAuthError } = await import('../domain/validation.ts')
     try {
       const validated = loginSchema.parse({ email, password })
 
@@ -140,6 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function resetPassword(email: string): Promise<{ success: boolean; error?: string }> {
+    const { resetPasswordRequestSchema, formatAuthError } = await import('../domain/validation.ts')
     try {
       const validated = resetPasswordRequestSchema.parse({ email })
 
@@ -169,6 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function updatePassword(password: string): Promise<{ success: boolean; error?: string }> {
+    const { updatePasswordSchema, formatAuthError } = await import('../domain/validation.ts')
     try {
       const validated = updatePasswordSchema.parse({ password, confirmPassword: password })
 

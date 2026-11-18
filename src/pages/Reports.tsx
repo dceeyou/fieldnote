@@ -16,6 +16,9 @@ import { Card } from '../components/ui/Card.tsx'
 import { Select } from '../components/ui/Select.tsx'
 import { ExportModal } from '../components/export/ExportModal.tsx'
 import { getTransactions } from '../services/transactionService.ts'
+import { getAllCategories } from '../services/categoryService.ts'
+import { getAllLands } from '../services/landService.ts'
+import { getAllCrops } from '../services/cropService.ts'
 import {
   getMonthlyFinancials,
   getCategoryFinancials,
@@ -48,19 +51,32 @@ export function Reports() {
   async function loadReportData() {
     setLoading(true)
     try {
-      const allTx = await getTransactions()
-      const filteredTx = selectedYear === 'all'
-        ? allTx
-        : allTx.filter((t) => t.date.startsWith(selectedYear))
+      const txFilters =
+        selectedYear === 'all'
+          ? undefined
+          : {
+              startDate: `${selectedYear}-01-01`,
+              endDate: `${selectedYear}-12-31`,
+            }
+
+      const [filteredTx, allCategories, allLands, allCrops] = await Promise.all([
+        getTransactions(txFilters),
+        getAllCategories(true),
+        getAllLands(true),
+        getAllCrops(true),
+      ])
 
       setTransactions(filteredTx)
 
       const [monthly, expCats, incCats, lands, crops] = await Promise.all([
-        getMonthlyFinancials(selectedYear === 'all' ? undefined : selectedYear),
-        getCategoryFinancials(filteredTx, 'expense'),
-        getCategoryFinancials(filteredTx, 'income'),
-        getLandFinancials(filteredTx),
-        getCropFinancials(filteredTx),
+        getMonthlyFinancials(
+          selectedYear === 'all' ? undefined : selectedYear,
+          filteredTx
+        ),
+        getCategoryFinancials(filteredTx, 'expense', allCategories),
+        getCategoryFinancials(filteredTx, 'income', allCategories),
+        getLandFinancials(filteredTx, allLands),
+        getCropFinancials(filteredTx, allCrops),
       ])
 
       setMonthlyData(monthly)

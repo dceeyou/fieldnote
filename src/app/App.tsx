@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, lazy, Suspense } from 'react'
 import { NavLink, Route, Routes, useLocation, useNavigate, Outlet } from 'react-router-dom'
 import {
   ArrowDownLeft,
@@ -6,6 +6,7 @@ import {
   Download,
   LayoutDashboard,
   Leaf,
+  Loader2,
   Menu,
   Moon,
   Plus,
@@ -23,20 +24,47 @@ import { useTheme } from './ThemeProvider'
 import { AuthProvider, useAuth } from '../context/AuthContext.tsx'
 import { ProtectedRoute } from '../components/auth/ProtectedRoute.tsx'
 import { GuestRoute } from '../components/auth/GuestRoute.tsx'
-import { Login } from '../pages/Login.tsx'
-import { ResetPassword } from '../pages/ResetPassword.tsx'
-import { CultivationAreas } from '../pages/CultivationAreas.tsx'
-import { Settings } from '../pages/Settings.tsx'
-import { Transactions } from '../pages/Transactions.tsx'
-import { FertilizerTracker } from '../pages/FertilizerTracker.tsx'
-import { Dashboard } from '../pages/Dashboard.tsx'
-import { Reports } from '../pages/Reports.tsx'
-import { seedDatabaseIfEmpty } from '../data/db/seed.ts'
-import { syncWorkspace } from '../services/syncService.ts'
 import { MobileBottomNav } from '../components/navigation/MobileBottomNav.tsx'
 import { OfflineIndicator } from '../components/pwa/OfflineIndicator.tsx'
 import { PwaInstallModal } from '../components/pwa/PwaInstallModal.tsx'
 import { PwaUpdateBanner } from '../components/pwa/PwaUpdateBanner.tsx'
+
+// Route-level code splitting for fast initial load (<300 KB entry bundle)
+const Login = lazy(() => import('../pages/Login.tsx').then((m) => ({ default: m.Login })))
+const ResetPassword = lazy(() =>
+  import('../pages/ResetPassword.tsx').then((m) => ({ default: m.ResetPassword }))
+)
+const Dashboard = lazy(() =>
+  import('../pages/Dashboard.tsx').then((m) => ({ default: m.Dashboard }))
+)
+const Transactions = lazy(() =>
+  import('../pages/Transactions.tsx').then((m) => ({ default: m.Transactions }))
+)
+const FertilizerTracker = lazy(() =>
+  import('../pages/FertilizerTracker.tsx').then((m) => ({ default: m.FertilizerTracker }))
+)
+const CultivationAreas = lazy(() =>
+  import('../pages/CultivationAreas.tsx').then((m) => ({ default: m.CultivationAreas }))
+)
+const Reports = lazy(() =>
+  import('../pages/Reports.tsx').then((m) => ({ default: m.Reports }))
+)
+const Settings = lazy(() =>
+  import('../pages/Settings.tsx').then((m) => ({ default: m.Settings }))
+)
+
+function RouteLoadingFallback() {
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className="flex min-h-[50vh] flex-col items-center justify-center gap-3 p-6 text-muted"
+    >
+      <Loader2 size={24} className="animate-spin text-forest-600" />
+      <p className="text-xs font-medium">Loading view...</p>
+    </div>
+  )
+}
 
 const navigation = [
   { label: 'Dashboard', to: '/', icon: LayoutDashboard },
@@ -196,19 +224,31 @@ function WorkspaceLayout() {
   const { user, logout } = useAuth()
 
   useEffect(() => {
-    seedDatabaseIfEmpty()
-      .then(() => {
-        if (navigator.onLine) {
+    let active = true
+
+    Promise.all([
+      import('../data/db/seed.ts'),
+      import('../services/syncService.ts'),
+    ])
+      .then(async ([{ seedDatabaseIfEmpty }, { syncWorkspace }]) => {
+        if (!active) return
+        await seedDatabaseIfEmpty()
+        if (active && navigator.onLine) {
           syncWorkspace().catch(console.warn)
         }
       })
       .catch(console.error)
 
     const handleOnline = () => {
-      syncWorkspace().catch(console.warn)
+      import('../services/syncService.ts')
+        .then(({ syncWorkspace }) => syncWorkspace())
+        .catch(console.warn)
     }
     window.addEventListener('online', handleOnline)
-    return () => window.removeEventListener('online', handleOnline)
+    return () => {
+      active = false
+      window.removeEventListener('online', handleOnline)
+    }
   }, [])
 
   // Close Quick Actions dropdown on outside click or Escape
@@ -410,35 +450,37 @@ function WorkspaceLayout() {
 export default function App() {
   return (
     <AuthProvider>
-      <Routes>
-        {/* Public / Unauthenticated Routes */}
-        <Route
-          path="/login"
-          element={
-            <GuestRoute>
-              <Login />
-            </GuestRoute>
-          }
-        />
-        <Route path="/reset-password" element={<ResetPassword />} />
+      <Suspense fallback={<RouteLoadingFallback />}>
+        <Routes>
+          {/* Public / Unauthenticated Routes */}
+          <Route
+            path="/login"
+            element={
+              <GuestRoute>
+                <Login />
+              </GuestRoute>
+            }
+          />
+          <Route path="/reset-password" element={<ResetPassword />} />
 
-        {/* Protected Workspace Routes */}
-        <Route
-          element={
-            <ProtectedRoute>
-              <WorkspaceLayout />
-            </ProtectedRoute>
-          }
-        >
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/transactions" element={<Transactions />} />
-          <Route path="/fertilizer" element={<FertilizerTracker />} />
-          <Route path="/cultivation" element={<CultivationAreas />} />
-          <Route path="/reports" element={<Reports />} />
-          <Route path="/settings" element={<Settings />} />
-          <Route path="*" element={<PlaceholderPage title="Workspace" />} />
-        </Route>
-      </Routes>
+          {/* Protected Workspace Routes */}
+          <Route
+            element={
+              <ProtectedRoute>
+                <WorkspaceLayout />
+              </ProtectedRoute>
+            }
+          >
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/transactions" element={<Transactions />} />
+            <Route path="/fertilizer" element={<FertilizerTracker />} />
+            <Route path="/cultivation" element={<CultivationAreas />} />
+            <Route path="/reports" element={<Reports />} />
+            <Route path="/settings" element={<Settings />} />
+            <Route path="*" element={<PlaceholderPage title="Workspace" />} />
+          </Route>
+        </Routes>
+      </Suspense>
     </AuthProvider>
   )
 }

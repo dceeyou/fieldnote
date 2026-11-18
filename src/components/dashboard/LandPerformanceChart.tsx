@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   BarChart,
@@ -64,7 +65,9 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   return null
 }
 
-export function LandPerformanceChart({ data }: LandPerformanceChartProps) {
+export const LandPerformanceChart = memo(function LandPerformanceChart({
+  data,
+}: LandPerformanceChartProps) {
   const navigate = useNavigate()
 
   return (
@@ -169,4 +172,4 @@ export function LandPerformanceChart({ data }: LandPerformanceChartProps) {
       </p>
     </Card>
   )
-}
+})

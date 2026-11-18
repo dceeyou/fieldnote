@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   ArrowDownLeft,
@@ -16,7 +17,9 @@ interface FinancialSummaryCardsProps {
   kpis: FinancialKPIs
 }
 
-export function FinancialSummaryCards({ kpis }: FinancialSummaryCardsProps) {
+export const FinancialSummaryCards = memo(function FinancialSummaryCards({
+  kpis,
+}: FinancialSummaryCardsProps) {
   const navigate = useNavigate()
 
   return (
@@ -203,4 +206,4 @@ export function FinancialSummaryCards({ kpis }: FinancialSummaryCardsProps) {
       </Card>
     </div>
   )
-}
+})

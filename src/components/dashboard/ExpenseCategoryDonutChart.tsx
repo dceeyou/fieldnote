@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   PieChart,
@@ -45,7 +45,7 @@ function CustomTooltip({ active, payload }: CustomTooltipProps) {
   return null
 }
 
-export function ExpenseCategoryDonutChart({
+export const ExpenseCategoryDonutChart = memo(function ExpenseCategoryDonutChart({
   data,
   totalExpenses,
 }: ExpenseCategoryDonutChartProps) {
@@ -156,4 +156,4 @@ export function ExpenseCategoryDonutChart({
       </p>
     </Card>
   )
-}
+})

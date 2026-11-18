@@ -1,77 +1,105 @@
-# Fieldnote — Agriculture Management
+# AgriFlow — Agriculture Management System
 
-A lightweight, local-first agriculture management web application designed for individual farm owner/operators managing small and expanding cultivation areas across multiple lands.
+A local-first, offline-capable Progressive Web App (PWA) for managing cultivation lands, crop associations, farm income & expenses (LKR), fertilizer schedules & reminders, financial analytics, and cloud synchronization.
+
+---
+
+## Technology Stack
+
+- **Frontend**: React 18, TypeScript 5.7, Vite 6, Tailwind CSS 3, React Router 6
+- **Local Persistence**: IndexedDB via Dexie.js (v2 schema with `syncDeletions` tombstones)
+- **Cloud Auth & Sync**: Supabase Auth + PostgreSQL with strict Row Level Security (RLS)
+- **Analytics & Charts**: Recharts (code-split & lazy-loaded per chart)
+- **Exports & Imports**: ExcelJS (dynamically imported `.xlsx` workbooks), PapaParse (CSV)
+- **Validation**: Zod v4
+- **Timezone & Units**: `Asia/Colombo` (`YYYY-MM-DD` calendar arithmetic), Sri Lankan Rupee (`LKR`), Acres & Perches (`1 acre = 160 perches`)
+- **Testing & CI**: Node native test runner (`npm test`), Playwright Chromium E2E (`npm run test:e2e`), GitHub Actions (`.github/workflows/ci.yml`)
+
+---
 
 ## Requirements
 
-- Node.js 20 or newer
-- npm
+- **Node.js 22+** (required for `--experimental-strip-types` unit/integration tests)
+- **npm 10+**
 
-## Start locally
+---
+
+## Quick Start
+
+### 1. Configure Environment Variables
+
+Copy `.env.example` to `.env.local` and fill in your Supabase project URL and anon/publishable key:
+
+```sh
+cp .env.example .env.local
+```
+
+Required variables:
+- `VITE_SUPABASE_URL` — Your Supabase project URL
+- `VITE_SUPABASE_ANON_KEY` — Your Supabase public anon/publishable key
+
+Never commit `.env`, `.env.local`, or any service role keys.
+
+### 2. Install & Run Locally
 
 ```sh
 # Install dependencies
 npm install
 
-# Start development server
+# Start local development server (http://localhost:5173)
 npm run dev
 
-# Run unit tests
-npm test
-
-# Run ESLint
-npm run lint
-
-# Build for production
+# Build for production (runs TypeScript check + Vite build + SW precache injection)
 npm run build
+
+# Preview production build locally (http://127.0.0.1:4173)
+npm run preview
 ```
 
-## Technology Stack
+---
 
-- **Frontend**: React 18, TypeScript, Vite, Tailwind CSS, React Router
-- **Persistence**: Local-first IndexedDB through Dexie.js (no cloud network requirement for normal operation)
-- **Validation**: Zod schema validation
-- **Timezone**: Asia/Colombo (date-only calendar handling `YYYY-MM-DD` to prevent timezone drift)
-- **Currency**: Sri Lankan Rupee (LKR)
-- **Area Units**: Acres and Perches (1 acre = 160 perches)
-- **Testing**: Built-in test runner (`npm test`) with 24 unit tests covering calculations, reminders, date math, validation, backup, and imports
+## Automated Testing & Quality Gates
 
-## Features & Modules
+```sh
+# Strict TypeScript compilation check
+npx tsc -b
 
-### 1. Dashboard
-- Live financial performance summary (Total Income, Total Expenses, Net Balance) derived from records for the selected month.
-- Runtime evaluated fertilizer reminder alerts (`overdue`, `due_today`, `due_soon` within 7 days) in Asia/Colombo timezone.
-- Quick action shortcuts and recent recorded transactions.
+# ESLint code quality check
+npm run lint
 
-### 2. Financial Transactions
-- Log income and expenses in LKR with date, description, amount, payment method, and reference #.
-- **Mandatory Land Rule**: Every financial record must be assigned to a cultivation area.
-- Crop association is optional.
-- Multi-criteria filtering by period (This Month, All Time, Custom Range), type, land, crop, and category.
-- Summary metrics bar updating in real time with filtered totals.
+# Unit & integration test suite (calculations, sync, reminders, pagination, ExcelJS, PWA)
+npm test
 
-### 3. Cultivation Areas
-- Manage lands and farm plots with location, area size (acres or perches with normalized acres calculation), notes, and associated crops.
-- Soft deactivation preserves historical transaction records without orphaned references.
+# Browser-based E2E & offline PWA tests (Chromium via Playwright)
+# First time only: npx playwright install chromium
+npm run build && npm run test:e2e
+```
 
-### 4. Fertilizer Tracker
-- Schedule fertilizer applications with target land, crop, fertilizer product, quantity, and next due date.
-- Visual status badges for overdue, due today, due soon, upcoming, and completed applications.
-- Mark completed workflow with actual completion date and option to auto-schedule the next round.
+### Continuous Integration
 
-### 5. Reports & Analytics
-- Monthly income vs expense summary and net balance trends.
-- Category spending and revenue breakdown with distribution bars.
-- Land-wise and crop-wise profitability summaries.
-- Print-friendly layout (`window.print()`).
-- Clearly labeled operational reporting basis (does not imply formal statutory accounting).
+Every push and pull request to `main` triggers `.github/workflows/ci.yml`, which enforces:
+1. `npx tsc -b` (TypeScript strict build)
+2. `npm run lint` (ESLint)
+3. `npm test` (unit + integration + sync regression tests)
+4. `npm run build` + Service Worker precache verification
+5. `npm run test:e2e` (Playwright Chromium responsive, routing, and offline PWA tests)
 
-### 6. Settings & Master Data
-- Light, Dark, and System theme preferences persisted in local storage.
-- Manage transaction categories (income vs expense).
-- Manage crops and fertilizers catalogs.
+---
 
-### 7. Data Safety & CSV Import
-- **JSON Backup**: One-click full workspace export to a portable, versioned JSON snapshot.
-- **Validated Restore**: Schema version check and preview of tables before overwriting, with a prompt to take a safety backup.
-- **CSV Transaction Import**: Browser-side parsing, column auto-detection, duplicate candidate flagging, and mandatory land assignment per row.
+## Core Modules
+
+1. **Farm Overview Dashboard (`/`)**: Live financial KPIs, interactive Recharts analytics (lazy-loaded), Open-Meteo agricultural weather, overdue/upcoming fertilizer reminders, and recent transactions.
+2. **Transactions Ledger (`/transactions`)**: Income & expense tracking in LKR with mandatory cultivation land assignment, indexed Dexie filtering, pagination (`25 / 50 / 100` rows), bulk delete confirmation, CSV import with duplicate flagging, and `.xlsx` export.
+3. **Fertilizer Tracker (`/fertilizer`)**: Product catalog and application scheduling with automatic reminder interval calculations (`7 days` to `1 year` or custom), overdue/due-soon evaluation, and quick completion.
+4. **Cultivation Areas (`/cultivation`)**: Land/plot registry with Acres/Perches normalization, crop associations, and soft deactivation preserving historical records.
+5. **Reports (`/reports`)**: Yearly and all-time operational financial breakdowns by month, category, land, and crop with print and ExcelJS export support.
+6. **Settings (`/settings`)**: Light/Dark/System theme preferences, category management (including CSV bulk import & duplicate audit), cloud sync controls, and versioned JSON backup/restore (compatible with both `AgriFlow` and legacy `Fieldnote` backups).
+
+---
+
+## Deployment (Vercel + Supabase)
+
+1. **Database**: Apply `supabase/schema.sql` and hardening migrations in `supabase/migrations/` to your Supabase project. Ensure RLS is enabled on all 7 public tables (`lands`, `crops`, `land_crops`, `categories`, `fertilizers`, `transactions`, `fertilizer_applications`) with authenticated single-admin policies.
+2. **Admin Account**: Provision the administrator account using `npm run auth:setup-admin` (or via the Supabase Auth dashboard) and disable public signups.
+3. **Hosting**: Connect the repository to Vercel. `vercel.json` configures SPA rewrites, security headers (CSP, HSTS, `X-Frame-Options`, `X-Content-Type-Options`), and proper `Cache-Control` rules for `sw.js` and `manifest.json`.
+4. **Environment Variables**: Configure `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` in Vercel Project Settings for Production and Preview environments.

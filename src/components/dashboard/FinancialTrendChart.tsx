@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { memo, useState } from 'react'
 import {
   LineChart,
   Line,
@@ -52,7 +52,9 @@ function CustomTooltip({ active, payload, label }: CustomTooltipProps) {
   return null
 }
 
-export function FinancialTrendChart({ data }: FinancialTrendChartProps) {
+export const FinancialTrendChart = memo(function FinancialTrendChart({
+  data,
+}: FinancialTrendChartProps) {
   const [showIncome, setShowIncome] = useState(true)
   const [showExpenses, setShowExpenses] = useState(true)
 
@@ -153,4 +155,4 @@ export function FinancialTrendChart({ data }: FinancialTrendChartProps) {
       </p>
     </Card>
   )
-}
+})

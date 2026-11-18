@@ -1,3 +1,4 @@
+import { lazy, Suspense } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Plus,
@@ -13,17 +14,55 @@ import { DatePicker } from '../components/ui/date-picker.tsx'
 import { GreetingHeader } from '../components/dashboard/GreetingHeader.tsx'
 import { WeatherWidget } from '../components/dashboard/WeatherWidget.tsx'
 import { FinancialSummaryCards } from '../components/dashboard/FinancialSummaryCard.tsx'
-import { IncomeExpenseBarChart } from '../components/dashboard/IncomeExpenseBarChart.tsx'
-import { FinancialTrendChart } from '../components/dashboard/FinancialTrendChart.tsx'
-import { ExpenseCategoryDonutChart } from '../components/dashboard/ExpenseCategoryDonutChart.tsx'
-import { CropPerformanceChart } from '../components/dashboard/CropPerformanceChart.tsx'
-import { LandPerformanceChart } from '../components/dashboard/LandPerformanceChart.tsx'
 import { FertilizerStatusOverview } from '../components/dashboard/FertilizerStatusOverview.tsx'
 import { RecentTransactions } from '../components/dashboard/RecentTransactions.tsx'
-import { ExpenseDistributionStackedChart } from '../components/dashboard/ExpenseDistributionStackedChart.tsx'
 import { useDashboardFilters } from '../hooks/useDashboardFilters.ts'
 import { useDashboardAnalytics } from '../hooks/useDashboardAnalytics.ts'
 import type { DatePreset } from '../domain/dashboard.ts'
+
+const IncomeExpenseBarChart = lazy(() =>
+  import('../components/dashboard/IncomeExpenseBarChart.tsx').then((m) => ({
+    default: m.IncomeExpenseBarChart,
+  }))
+)
+const FinancialTrendChart = lazy(() =>
+  import('../components/dashboard/FinancialTrendChart.tsx').then((m) => ({
+    default: m.FinancialTrendChart,
+  }))
+)
+const ExpenseCategoryDonutChart = lazy(() =>
+  import('../components/dashboard/ExpenseCategoryDonutChart.tsx').then((m) => ({
+    default: m.ExpenseCategoryDonutChart,
+  }))
+)
+const CropPerformanceChart = lazy(() =>
+  import('../components/dashboard/CropPerformanceChart.tsx').then((m) => ({
+    default: m.CropPerformanceChart,
+  }))
+)
+const LandPerformanceChart = lazy(() =>
+  import('../components/dashboard/LandPerformanceChart.tsx').then((m) => ({
+    default: m.LandPerformanceChart,
+  }))
+)
+const ExpenseDistributionStackedChart = lazy(() =>
+  import('../components/dashboard/ExpenseDistributionStackedChart.tsx').then((m) => ({
+    default: m.ExpenseDistributionStackedChart,
+  }))
+)
+
+function ChartLoadingSkeleton({ label }: { label: string }) {
+  return (
+    <div
+      className="flex h-80 flex-col justify-center rounded-xl border border-border bg-surface p-6 text-center"
+      role="status"
+      aria-live="polite"
+    >
+      <div className="mx-auto size-6 animate-spin rounded-full border-2 border-border border-t-forest-600" />
+      <p className="mt-2.5 text-xs text-muted">Loading {label}...</p>
+    </div>
+  )
+}
 
 export function Dashboard() {
   const navigate = useNavigate()
@@ -277,30 +316,40 @@ export function Dashboard() {
         {/* Row 1: Monthly Comparison & Cash Trend */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           <div className="lg:col-span-6">
-            <IncomeExpenseBarChart data={analytics.monthlyComparison} />
+            <Suspense fallback={<ChartLoadingSkeleton label="monthly comparison" />}>
+              <IncomeExpenseBarChart data={analytics.monthlyComparison} />
+            </Suspense>
           </div>
           <div className="lg:col-span-6">
-            <FinancialTrendChart data={analytics.financialTrend} />
+            <Suspense fallback={<ChartLoadingSkeleton label="financial trend" />}>
+              <FinancialTrendChart data={analytics.financialTrend} />
+            </Suspense>
           </div>
         </div>
 
         {/* Row 2: Expense Category Donut & Crop Performance */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           <div className="lg:col-span-6">
-            <ExpenseCategoryDonutChart
-              data={analytics.categoryBreakdown}
-              totalExpenses={analytics.kpis.totalExpenses}
-            />
+            <Suspense fallback={<ChartLoadingSkeleton label="category breakdown" />}>
+              <ExpenseCategoryDonutChart
+                data={analytics.categoryBreakdown}
+                totalExpenses={analytics.kpis.totalExpenses}
+              />
+            </Suspense>
           </div>
           <div className="lg:col-span-6">
-            <CropPerformanceChart data={analytics.cropPerformance} />
+            <Suspense fallback={<ChartLoadingSkeleton label="crop performance" />}>
+              <CropPerformanceChart data={analytics.cropPerformance} />
+            </Suspense>
           </div>
         </div>
 
         {/* Row 3: Land-wise Performance (Span 12 or 6) */}
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-12">
           <div className="lg:col-span-12">
-            <LandPerformanceChart data={analytics.landPerformance} />
+            <Suspense fallback={<ChartLoadingSkeleton label="land performance" />}>
+              <LandPerformanceChart data={analytics.landPerformance} />
+            </Suspense>
           </div>
         </div>
       </section>
@@ -331,10 +380,12 @@ export function Dashboard() {
           SECTION G: ADDITIONAL EXPENSE ANALYTICS (COLLAPSIBLE STACKED BAR CHART)
          ========================================================================= */}
       <section aria-label="Monthly Expense Distribution">
-        <ExpenseDistributionStackedChart
-          data={analytics.monthlyCategoryDistribution}
-          categoryNames={analytics.availableCategoryNames}
-        />
+        <Suspense fallback={<ChartLoadingSkeleton label="expense distribution" />}>
+          <ExpenseDistributionStackedChart
+            data={analytics.monthlyCategoryDistribution}
+            categoryNames={analytics.availableCategoryNames}
+          />
+        </Suspense>
       </section>
     </div>
   )

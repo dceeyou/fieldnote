@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
   Leaf,
@@ -18,7 +19,7 @@ interface FertilizerStatusOverviewProps {
   onQuickComplete?: (appId: string) => Promise<void>
 }
 
-export function FertilizerStatusOverview({
+export const FertilizerStatusOverview = memo(function FertilizerStatusOverview({
   statusData,
   onQuickComplete,
 }: FertilizerStatusOverviewProps) {
@@ -189,4 +190,4 @@ export function FertilizerStatusOverview({
       </div>
     </Card>
   )
-}
+})

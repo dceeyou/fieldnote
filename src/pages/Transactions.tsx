@@ -16,6 +16,8 @@ import {
   CheckCircle2,
   FileSpreadsheet,
   Download,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react'
 import { Button } from '../components/ui/Button.tsx'
 import { Card } from '../components/ui/Card.tsx'
@@ -53,6 +55,7 @@ import {
   getCurrentMonthColombo,
   formatDateDisplay,
 } from '../utils/date.ts'
+import { paginateItems } from '../utils/pagination.ts'
 
 export function Transactions() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -131,6 +134,10 @@ export function Transactions() {
   // Export State
   const [isExportModalOpen, setIsExportModalOpen] = useState(false)
 
+  // Pagination State
+  const [currentPage, setCurrentPage] = useState(1)
+  const [pageSize, setPageSize] = useState(25)
+
   // Quick lookup maps
   const landMap = useMemo(() => new Map(lands.map((l) => [l.id, l.name])), [lands])
   const cropMap = useMemo(() => new Map(crops.map((c) => [c.id, c.name])), [crops])
@@ -180,10 +187,16 @@ export function Transactions() {
   }, [])
 
   useEffect(() => {
+    setCurrentPage(1)
     loadTransactions()
   }, [search, typeFilter, landFilter, cropFilter, categoryFilter, datePreset, startDate, endDate])
 
   const summary = useMemo(() => calculateFinancialSummary(transactions), [transactions])
+
+  const paginated = useMemo(
+    () => paginateItems(transactions, currentPage, pageSize),
+    [transactions, currentPage, pageSize]
+  )
 
   // Available categories for current form type
   const activeCategoriesForType = useMemo(
@@ -319,7 +332,7 @@ export function Transactions() {
     }
   }
 
-  const visibleTxIds = useMemo(() => transactions.map((t) => t.id), [transactions])
+  const visibleTxIds = useMemo(() => paginated.items.map((t) => t.id), [paginated.items])
 
   const isAllVisibleSelected = useMemo(() => {
     return visibleTxIds.length > 0 && visibleTxIds.every((id) => selectedIds.has(id))
@@ -773,8 +786,8 @@ export function Transactions() {
               className="text-forest-700 dark:text-forest-300 underline font-medium hover:text-forest-900 dark:hover:text-forest-100 cursor-pointer"
             >
               {isAllVisibleSelected
-                ? 'Deselect visible'
-                : `Select all visible (${transactions.length})`}
+                ? 'Deselect page'
+                : `Select all on page (${paginated.items.length})`}
             </button>
             <button
               type="button"
@@ -825,7 +838,7 @@ export function Transactions() {
           <>
             {/* Mobile Card List View (< 640px) */}
             <div className="space-y-3 sm:hidden">
-              {transactions.map((tx) => {
+              {paginated.items.map((tx) => {
                 const isIncome = tx.type === 'income'
                 const isSelected = selectedIds.has(tx.id)
                 return (
@@ -931,7 +944,7 @@ export function Transactions() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {transactions.map((tx) => {
+                  {paginated.items.map((tx) => {
                     const isIncome = tx.type === 'income'
                     const isSelected = selectedIds.has(tx.id)
                     return (
@@ -1010,6 +1023,68 @@ export function Transactions() {
               </table>
             </div>
           </Card>
+
+            {/* Pagination Controls */}
+            <div
+              className="mt-4 flex flex-col gap-3 rounded-xl border border-border bg-surface px-4 py-3 text-xs sm:flex-row sm:items-center sm:justify-between"
+              aria-label="Transaction pagination"
+            >
+              <div className="flex flex-wrap items-center justify-between gap-2 sm:justify-start">
+                <span className="text-muted">
+                  Showing{' '}
+                  <strong className="font-semibold text-text">
+                    {paginated.startIndex}–{paginated.endIndex}
+                  </strong>{' '}
+                  of{' '}
+                  <strong className="font-semibold text-text">
+                    {paginated.totalItems}
+                  </strong>{' '}
+                  transaction{paginated.totalItems === 1 ? '' : 's'}
+                </span>
+                <label className="inline-flex items-center gap-1.5 text-muted">
+                  <span>Rows:</span>
+                  <select
+                    aria-label="Transactions per page"
+                    value={pageSize}
+                    onChange={(e) => {
+                      setPageSize(Number(e.target.value))
+                      setCurrentPage(1)
+                    }}
+                    className="min-h-[36px] rounded-md border border-border bg-canvas px-2 py-1 text-xs text-text focus:outline-none focus:ring-2 focus:ring-forest-500"
+                  >
+                    <option value={25}>25</option>
+                    <option value={50}>50</option>
+                    <option value={100}>100</option>
+                  </select>
+                </label>
+              </div>
+
+              <div className="flex items-center justify-between gap-2 sm:justify-end">
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="min-h-[40px] sm:min-h-[36px] gap-1"
+                  disabled={!paginated.hasPrevious}
+                  onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                >
+                  <ChevronLeft size={14} /> Previous
+                </Button>
+                <span className="px-2 font-medium text-text tabular-nums">
+                  Page {paginated.page} of {paginated.totalPages}
+                </span>
+                <Button
+                  type="button"
+                  variant="secondary"
+                  size="sm"
+                  className="min-h-[40px] sm:min-h-[36px] gap-1"
+                  disabled={!paginated.hasNext}
+                  onClick={() => setCurrentPage((p) => Math.min(paginated.totalPages, p + 1))}
+                >
+                  Next <ChevronRight size={14} />
+                </Button>
+              </div>
+            </div>
           </>
         )}
       </div>

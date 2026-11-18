@@ -2,7 +2,7 @@ import { getTransactions } from './transactionService.ts'
 import { getAllCategories } from './categoryService.ts'
 import { getAllLands } from './landService.ts'
 import { getAllCrops } from './cropService.ts'
-import type { Transaction } from '../data/db/schema.ts'
+import type { Category, Crop, Land, Transaction } from '../data/db/schema.ts'
 
 export interface MonthSummary {
   month: string // YYYY-MM
@@ -23,9 +23,19 @@ export interface EntityFinancialSummary {
   percentageOfIncome?: number
 }
 
-export async function getMonthlyFinancials(year?: string): Promise<MonthSummary[]> {
-  const allTx = await getTransactions()
-  const filtered = year ? allTx.filter((t) => t.date.startsWith(year)) : allTx
+export async function getMonthlyFinancials(
+  year?: string,
+  preloadedTransactions?: Transaction[]
+): Promise<MonthSummary[]> {
+  const filtered = preloadedTransactions
+    ? year
+      ? preloadedTransactions.filter((t) => t.date.startsWith(year))
+      : preloadedTransactions
+    : await getTransactions(
+        year
+          ? { startDate: `${year}-01-01`, endDate: `${year}-12-31` }
+          : undefined
+      )
 
   const monthMap = new Map<string, { income: number; expense: number; count: number }>()
 
@@ -57,9 +67,10 @@ export async function getMonthlyFinancials(year?: string): Promise<MonthSummary[
 
 export async function getCategoryFinancials(
   transactions: Transaction[],
-  type: 'income' | 'expense'
+  type: 'income' | 'expense',
+  preloadedCategories?: Category[]
 ): Promise<EntityFinancialSummary[]> {
-  const categories = await getAllCategories(true)
+  const categories = preloadedCategories ?? (await getAllCategories(true))
   const catMap = new Map(categories.map((c) => [c.id, c.name]))
 
   const filtered = transactions.filter((t) => t.type === type)
@@ -93,9 +104,10 @@ export async function getCategoryFinancials(
 }
 
 export async function getLandFinancials(
-  transactions: Transaction[]
+  transactions: Transaction[],
+  preloadedLands?: Land[]
 ): Promise<EntityFinancialSummary[]> {
-  const lands = await getAllLands(true)
+  const lands = preloadedLands ?? (await getAllLands(true))
   const landMap = new Map(lands.map((l) => [l.id, l.name]))
 
   const groupMap = new Map<string, { income: number; expense: number; count: number }>()
@@ -129,9 +141,10 @@ export async function getLandFinancials(
 }
 
 export async function getCropFinancials(
-  transactions: Transaction[]
+  transactions: Transaction[],
+  preloadedCrops?: Crop[]
 ): Promise<EntityFinancialSummary[]> {
-  const crops = await getAllCrops(true)
+  const crops = preloadedCrops ?? (await getAllCrops(true))
   const cropMap = new Map(crops.map((c) => [c.id, c.name]))
 
   const cropTx = transactions.filter((t) => !!t.cropId)

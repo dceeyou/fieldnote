@@ -103,11 +103,11 @@ self.addEventListener('fetch', (event) => {
           return networkResponse
         })
         .catch(async () => {
-          const cachedIndex = await caches.match('/index.html')
+          const cachedIndex = await caches.match('/index.html', { ignoreVary: true })
           if (cachedIndex) return cachedIndex
-          const cachedRoot = await caches.match('/')
+          const cachedRoot = await caches.match('/', { ignoreVary: true })
           if (cachedRoot) return cachedRoot
-          const offlineFallback = await caches.match(OFFLINE_URL)
+          const offlineFallback = await caches.match(OFFLINE_URL, { ignoreVary: true })
           return offlineFallback || makeOfflineAssetResponse()
         })
     )
@@ -129,23 +129,26 @@ self.addEventListener('fetch', (event) => {
 
   if (isStaticAsset && url.pathname !== '/sw.js') {
     event.respondWith(
-      caches.match(req).then((cached) => {
-        if (isHashedAsset && cached) {
-          return cached
-        }
+      caches
+        .match(req, { ignoreVary: true })
+        .then((cached) => cached || caches.match(url.pathname, { ignoreVary: true }))
+        .then((cached) => {
+          if (isHashedAsset && cached) {
+            return cached
+          }
 
-        const networkFetch = fetch(req)
-          .then((networkRes) => {
-            if (networkRes && networkRes.ok) {
-              const clone = networkRes.clone()
-              caches.open(CACHE_NAME).then((cache) => cache.put(req, clone))
-            }
-            return networkRes
-          })
-          .catch(() => cached || makeOfflineAssetResponse())
+          const networkFetch = fetch(req)
+            .then((networkRes) => {
+              if (networkRes && networkRes.ok) {
+                const clone = networkRes.clone()
+                caches.open(CACHE_NAME).then((cache) => cache.put(url.pathname, clone))
+              }
+              return networkRes
+            })
+            .catch(() => cached || makeOfflineAssetResponse())
 
-        return cached || networkFetch
-      })
+          return cached || networkFetch
+        })
     )
     return
   }
