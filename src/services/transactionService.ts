@@ -1,6 +1,7 @@
 import { db } from '../data/db/database.ts'
 import type { Transaction } from '../data/db/schema.ts'
 import { transactionInputSchema, type TransactionInput } from '../domain/validation.ts'
+import { syncUpsertRecord, syncDeleteRecord, syncDeleteRecords } from './syncService.ts'
 
 export interface TransactionFilters {
   startDate?: string
@@ -77,15 +78,19 @@ export async function saveTransaction(input: TransactionInput, id?: string): Pro
     await db.transactions.add(txRecord)
   }
 
+  await syncUpsertRecord('transactions', txRecord as unknown as Record<string, unknown>)
+
   return txRecord
 }
 
 export async function deleteTransaction(id: string): Promise<void> {
   await db.transactions.delete(id)
+  await syncDeleteRecord('transactions', id)
 }
 
 export async function bulkDeleteTransactions(ids: string[]): Promise<number> {
   if (ids.length === 0) return 0
   await db.transactions.bulkDelete(ids)
+  await syncDeleteRecords('transactions', ids)
   return ids.length
 }

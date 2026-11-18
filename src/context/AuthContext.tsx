@@ -1,6 +1,12 @@
 import { createContext, useContext, useEffect, useState, type ReactNode } from 'react'
 import type { User, Session } from '@supabase/supabase-js'
-import { supabase, isSupabaseConfigured, secureSessionStorage } from '../lib/supabase.ts'
+import {
+  supabase,
+  supabaseUrl,
+  isSupabaseConfigured,
+  secureSessionStorage,
+  getSupabaseAuthStorageKey,
+} from '../lib/supabase.ts'
 import {
   loginSchema,
   resetPasswordRequestSchema,
@@ -64,8 +70,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (event === 'SIGNED_OUT') {
         setUser(null)
         setSession(null)
-        // Ensure tokens are cleanly wiped from storage
-        secureSessionStorage.removeItem('sb-' + (supabase as unknown as { supabaseKey?: string })?.supabaseKey + '-auth-token')
+        // Ensure tokens are cleanly wiped from both cookie and localStorage
+        const authKey = getSupabaseAuthStorageKey(supabaseUrl)
+        if (authKey) {
+          secureSessionStorage.removeItem(authKey)
+        }
       } else if (newSession) {
         setSession(newSession)
         setUser(newSession.user)
@@ -121,6 +130,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     } catch (err) {
       console.warn('Error during sign out:', err)
     } finally {
+      const authKey = getSupabaseAuthStorageKey(supabaseUrl)
+      if (authKey) {
+        secureSessionStorage.removeItem(authKey)
+      }
       setUser(null)
       setSession(null)
     }

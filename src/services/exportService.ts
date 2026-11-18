@@ -1,5 +1,5 @@
-import * as XLSX from 'xlsx'
-import { supabase, isSupabaseConfigured, checkSupabaseConnection } from '../lib/supabase.ts'
+import type ExcelJS from 'exceljs'
+import { supabase, isSupabaseConfigured } from '../lib/supabase.ts'
 import { db } from '../data/db/database.ts'
 import type { Transaction, FertilizerApplication } from '../data/db/schema.ts'
 import {
@@ -9,6 +9,7 @@ import {
   formatDateDDMMYYYY,
 } from '../utils/date.ts'
 import { getFertilizerDueStatus } from '../utils/reminders.ts'
+import { toCamelCase, reconcileRecords, getPendingDeletionIds } from './syncService.ts'
 
 export type ExportDataType = 'all' | 'transactions' | 'fertilizer'
 
@@ -52,18 +53,6 @@ export interface ExportPayload {
   generatedAt: string
   dateRangeLabel: string
   dateRangeSpan: string
-}
-
-// Convert snake_case object from Supabase to camelCase
-function toCamelCase(obj: Record<string, unknown>): Record<string, unknown> {
-  const result: Record<string, unknown> = {}
-  for (const [key, val] of Object.entries(obj)) {
-    const camelKey = key.replace(/_([a-z])/g, (_, letter) => letter.toUpperCase())
-    if (val !== null) {
-      result[camelKey] = val
-    }
-  }
-  return result
 }
 
 /**
@@ -139,13 +128,14 @@ export function computeExportDateBounds(
     default: {
       const start = customStart || ''
       const end = customEnd || ''
-      const span = start && end
-        ? `${formatDateDDMMYYYY(start)} – ${formatDateDDMMYYYY(end)}`
-        : start
-        ? `From ${formatDateDDMMYYYY(start)}`
-        : end
-        ? `Up to ${formatDateDDMMYYYY(end)}`
-        : 'All available records'
+      const span =
+        start && end
+          ? `${formatDateDDMMYYYY(start)} – ${formatDateDDMMYYYY(end)}`
+          : start
+          ? `From ${formatDateDDMMYYYY(start)}`
+          : end
+          ? `Up to ${formatDateDDMMYYYY(end)}`
+          : 'All available records'
       return {
         startDate: start,
         endDate: end,
@@ -158,7 +148,7 @@ export function computeExportDateBounds(
 
 /**
  * Returns formatted filename using Asia/Colombo date.
- * Suggested: AgriFlow_Complete_Data_Export_YYYY-MM-DD.xlsx
+ * Format: AgriFlow_Complete_Data_Export_YYYY-MM-DD.xlsx
  */
 export function getExportFilename(dateStr?: string): string {
   const d = dateStr || getTodayColombo()
@@ -182,10 +172,9 @@ export function getColomboFormattedTimestamp(date: Date = new Date()): string {
 }
 
 /**
- * Resolves metadata maps (lands, crops, categories, fertilizers).
+ * Resolves metadata maps (lands, crops, categories, fertilizers) from both Dexie and Supabase.
  */
 export async function fetchExportMetadata(): Promise<ExportMetadata> {
-  // Query metadata from local database and Supabase if connected
   const [localLands, localCrops, localCats, localFerts] = await Promise.all([
     db.lands.toArray(),
     db.crops.toArray(),
@@ -198,7 +187,6 @@ export async function fetchExportMetadata(): Promise<ExportMetadata> {
   const categoryMap = new Map<string, string>(localCats.map((c) => [c.id, c.name]))
   const fertilizerMap = new Map<string, string>(localFerts.map((f) => [f.id, f.name]))
 
-  // If Supabase is configured, supplement any additional cloud records
   if (isSupabaseConfigured && supabase) {
     try {
       const [sbLands, sbCrops, sbCats, sbFerts] = await Promise.all([
@@ -208,12 +196,12 @@ export async function fetchExportMetadata(): Promise<ExportMetadata> {
         supabase.from('fertilizers').select('id, name'),
       ])
 
-      if (sbLands.data) sbLands.data.forEach((l) => landMap.set(l.id, l.name))
-      if (sbCrops.data) sbCrops.data.forEach((c) => cropMap.set(c.id, c.name))
-      if (sbCats.data) sbCats.data.forEach((c) => categoryMap.set(c.id, c.name))
-      if (sbFerts.data) sbFerts.data.forEach((f) => fertilizerMap.set(f.id, f.name))
+      if (sbLands.data) sbLands.data.forEach((l) => { if (!landMap.has(l.id)) landMap.set(l.id, l.name) })
+      if (sbCrops.data) sbCrops.data.forEach((c) => { if (!cropMap.has(c.id)) cropMap.set(c.id, c.name) })
+      if (sbCats.data) sbCats.data.forEach((c) => { if (!categoryMap.has(c.id)) categoryMap.set(c.id, c.name) })
+      if (sbFerts.data) sbFerts.data.forEach((f) => { if (!fertilizerMap.has(f.id)) fertilizerMap.set(f.id, f.name) })
     } catch {
-      // Continue with local maps
+      // Offline / unreachable: local Dexie maps remain authoritative
     }
   }
 
@@ -221,118 +209,125 @@ export async function fetchExportMetadata(): Promise<ExportMetadata> {
 }
 
 /**
- * Fetches all transactions from Supabase with batching / pagination.
- * If Supabase is empty but local Dexie has records, retrieves local Dexie records.
+ * Fetches and merges transactions from both local Dexie and remote Supabase
+ * so unsynced local records are never omitted and pending deletions are honored.
  */
 async function fetchTransactionsBatch(startDate?: string, endDate?: string): Promise<Transaction[]> {
-  const batchSize = 1000
-  let allRows: Record<string, unknown>[] = []
+  const [localAll, pendingDeleted] = await Promise.all([
+    db.transactions.toArray(),
+    getPendingDeletionIds('transactions'),
+  ])
 
-  if (isSupabaseConfigured && supabase) {
-    let from = 0
-    let hasMore = true
-
-    while (hasMore) {
-      let query = supabase
-        .from('transactions')
-        .select('*')
-        .order('date', { ascending: false })
-        .range(from, from + batchSize - 1)
-
-      if (startDate) query = query.gte('date', startDate)
-      if (endDate) query = query.lte('date', endDate)
-
-      const { data, error } = await query
-      if (error) {
-        throw new Error(`Failed to query transaction records from Supabase: ${error.message}`)
-      }
-
-      if (data && data.length > 0) {
-        allRows = allRows.concat(data)
-        if (data.length < batchSize) {
-          hasMore = false
-        } else {
-          from += batchSize
-        }
-      } else {
-        hasMore = false
-      }
-    }
-  }
-
-  // If Supabase returned records, map to camelCase
-  if (allRows.length > 0) {
-    const map = new Map<string, Record<string, unknown>>()
-    for (const row of allRows) {
-      map.set(row.id as string, row)
-    }
-    return Array.from(map.values()).map(toCamelCase) as unknown as Transaction[]
-  }
-
-  // Fallback / local-first records from Dexie
-  let localTx = await db.transactions.toArray()
+  let localTx = localAll
   if (startDate) localTx = localTx.filter((t) => t.date >= startDate)
   if (endDate) localTx = localTx.filter((t) => t.date <= endDate)
-  return localTx.sort((a, b) => b.date.localeCompare(a.date))
+
+  let remoteTx: Transaction[] = []
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const batchSize = 1000
+      let from = 0
+      let hasMore = true
+      const rawRows: Record<string, unknown>[] = []
+
+      while (hasMore) {
+        let query = supabase
+          .from('transactions')
+          .select('*')
+          .order('date', { ascending: false })
+          .range(from, from + batchSize - 1)
+
+        if (startDate) query = query.gte('date', startDate)
+        if (endDate) query = query.lte('date', endDate)
+
+        const { data, error } = await query
+        if (error) {
+          console.warn('Export Supabase transaction fetch skipped (using local):', error.message)
+          break
+        }
+
+        if (data && data.length > 0) {
+          rawRows.push(...data)
+          if (data.length < batchSize) {
+            hasMore = false
+          } else {
+            from += batchSize
+          }
+        } else {
+          hasMore = false
+        }
+      }
+
+      remoteTx = rawRows.map((row) => toCamelCase(row) as unknown as Transaction)
+    } catch (err) {
+      console.warn('Export offline fallback for transactions:', err)
+    }
+  }
+
+  const { merged } = reconcileRecords(localTx, remoteTx, pendingDeleted)
+  return merged.sort((a, b) => b.date.localeCompare(a.date) || (b.createdAt || '').localeCompare(a.createdAt || ''))
 }
 
 /**
- * Fetches all fertilizer applications from Supabase with batching / pagination.
- * If Supabase is empty but local Dexie has records, retrieves local Dexie records.
+ * Fetches and merges fertilizer applications from both local Dexie and remote Supabase.
  */
 async function fetchFertilizerApplicationsBatch(
   startDate?: string,
   endDate?: string
 ): Promise<FertilizerApplication[]> {
-  const batchSize = 1000
-  let allRows: Record<string, unknown>[] = []
+  const [localAll, pendingDeleted] = await Promise.all([
+    db.fertilizerApplications.toArray(),
+    getPendingDeletionIds('fertilizer_applications'),
+  ])
 
-  if (isSupabaseConfigured && supabase) {
-    let from = 0
-    let hasMore = true
-
-    while (hasMore) {
-      let query = supabase
-        .from('fertilizer_applications')
-        .select('*')
-        .order('application_date', { ascending: false })
-        .range(from, from + batchSize - 1)
-
-      if (startDate) query = query.gte('application_date', startDate)
-      if (endDate) query = query.lte('application_date', endDate)
-
-      const { data, error } = await query
-      if (error) {
-        throw new Error(`Failed to query fertilizer application records from Supabase: ${error.message}`)
-      }
-
-      if (data && data.length > 0) {
-        allRows = allRows.concat(data)
-        if (data.length < batchSize) {
-          hasMore = false
-        } else {
-          from += batchSize
-        }
-      } else {
-        hasMore = false
-      }
-    }
-  }
-
-  // If Supabase returned records, map to camelCase
-  if (allRows.length > 0) {
-    const map = new Map<string, Record<string, unknown>>()
-    for (const row of allRows) {
-      map.set(row.id as string, row)
-    }
-    return Array.from(map.values()).map(toCamelCase) as unknown as FertilizerApplication[]
-  }
-
-  // Fallback / local-first records from Dexie
-  let localApps = await db.fertilizerApplications.toArray()
+  let localApps = localAll
   if (startDate) localApps = localApps.filter((a) => a.applicationDate >= startDate)
   if (endDate) localApps = localApps.filter((a) => a.applicationDate <= endDate)
-  return localApps.sort((a, b) => b.applicationDate.localeCompare(a.applicationDate))
+
+  let remoteApps: FertilizerApplication[] = []
+  if (isSupabaseConfigured && supabase) {
+    try {
+      const batchSize = 1000
+      let from = 0
+      let hasMore = true
+      const rawRows: Record<string, unknown>[] = []
+
+      while (hasMore) {
+        let query = supabase
+          .from('fertilizer_applications')
+          .select('*')
+          .order('application_date', { ascending: false })
+          .range(from, from + batchSize - 1)
+
+        if (startDate) query = query.gte('application_date', startDate)
+        if (endDate) query = query.lte('application_date', endDate)
+
+        const { data, error } = await query
+        if (error) {
+          console.warn('Export Supabase fertilizer fetch skipped (using local):', error.message)
+          break
+        }
+
+        if (data && data.length > 0) {
+          rawRows.push(...data)
+          if (data.length < batchSize) {
+            hasMore = false
+          } else {
+            from += batchSize
+          }
+        } else {
+          hasMore = false
+        }
+      }
+
+      remoteApps = rawRows.map((row) => toCamelCase(row) as unknown as FertilizerApplication)
+    } catch (err) {
+      console.warn('Export offline fallback for fertilizer applications:', err)
+    }
+  }
+
+  const { merged } = reconcileRecords(localApps, remoteApps, pendingDeleted)
+  return merged.sort((a, b) => b.applicationDate.localeCompare(a.applicationDate))
 }
 
 /**
@@ -382,24 +377,15 @@ export async function getExportSummaryCounts(options: ExportOptions): Promise<Ex
 }
 
 /**
- * Validates prerequisites and queries matching datasets.
+ * Validates prerequisites and queries merged local + cloud datasets.
  */
 export async function loadExportPayload(options: ExportOptions): Promise<ExportPayload> {
-  // 1. Connection Validation if Supabase is configured
-  if (isSupabaseConfigured && supabase) {
-    const conn = await checkSupabaseConnection()
-    if (!conn.ok) {
-      throw new Error(`Supabase connection unavailable: ${conn.message}`)
-    }
-  }
-
   const { startDate, endDate, label, span } = computeExportDateBounds(
     options.datePreset,
     options.startDate,
     options.endDate
   )
 
-  // 2. Fetch metadata and datasets concurrently
   let transactions: Transaction[] = []
   let fertilizerApplications: FertilizerApplication[] = []
   let metadata: ExportMetadata
@@ -426,7 +412,6 @@ export async function loadExportPayload(options: ExportOptions): Promise<ExportP
     }
   }
 
-  // 3. Validation: Check if both datasets are empty
   if (transactions.length === 0 && fertilizerApplications.length === 0) {
     throw new Error('No records available to export.')
   }
@@ -443,17 +428,32 @@ export async function loadExportPayload(options: ExportOptions): Promise<ExportP
 }
 
 /**
- * Constructs a fully formatted Excel workbook with SheetJS containing the 3 worksheets.
+ * Lazily loads ExcelJS and constructs a formatted .xlsx workbook with up to 3 worksheets.
  */
-export function buildExcelWorkbook(payload: ExportPayload): XLSX.WorkBook {
-  const wb = XLSX.utils.book_new()
+export async function buildExcelWorkbook(payload: ExportPayload): Promise<ExcelJS.Workbook> {
+  const excelModule = await import('exceljs')
+  const Excel = (excelModule.default ?? excelModule) as typeof ExcelJS
+  const wb = new Excel.Workbook()
+  wb.creator = 'AgriFlow — Agriculture Management System'
+  wb.created = new Date()
+
   const today = getTodayColombo()
   const { transactions, fertilizerApplications, metadata, dateRangeLabel, dateRangeSpan, generatedAt } = payload
+
+  const headerStyle: Partial<ExcelJS.Style> = {
+    font: { bold: true, color: { argb: 'FFFFFFFF' } },
+    fill: { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FF386642' } },
+    alignment: { vertical: 'middle' },
+  }
 
   // --------------------------------------------------------------------------
   // SHEET 1: Transactions
   // --------------------------------------------------------------------------
   if (payload.options.dataType === 'all' || payload.options.dataType === 'transactions') {
+    const wsTx = wb.addWorksheet('Transactions', {
+      views: [{ state: 'frozen', ySplit: 1 }],
+    })
+
     const txHeaders = [
       'Transaction ID',
       'Transaction Date',
@@ -470,66 +470,52 @@ export function buildExcelWorkbook(payload: ExportPayload): XLSX.WorkBook {
       'Updated At',
     ]
 
-    const txRows = transactions.map((t) => [
-      t.id,
-      t.date,
-      t.type === 'income' ? 'Income' : 'Expense',
-      metadata.landMap.get(t.landId) || 'Unassigned',
-      (t.cropId && metadata.cropMap.get(t.cropId)) || '',
-      metadata.categoryMap.get(t.categoryId) || 'Uncategorized',
-      t.description || '',
-      typeof t.amount === 'number' ? t.amount : Number(t.amount) || 0,
-      t.paymentMethod || '',
-      t.referenceNumber || '',
-      t.notes || '',
-      t.createdAt || '',
-      t.updatedAt || '',
-    ])
+    const txWidths = [38, 16, 16, 24, 20, 24, 35, 18, 18, 24, 35, 24, 24]
+    wsTx.columns = txHeaders.map((header, idx) => ({
+      header,
+      key: `col_${idx}`,
+      width: txWidths[idx],
+    }))
 
-    const wsTx = XLSX.utils.aoa_to_sheet([txHeaders, ...txRows])
+    wsTx.getRow(1).eachCell((cell) => {
+      cell.style = headerStyle
+    })
 
-    // Format Amount (LKR) column cells as numeric currency
-    for (let r = 1; r <= txRows.length; r++) {
-      const cellRef = `H${r + 1}`
-      if (wsTx[cellRef]) {
-        wsTx[cellRef].t = 'n'
-        wsTx[cellRef].z = '#,##0.00'
-      }
+    for (const t of transactions) {
+      const numericAmount = typeof t.amount === 'number' ? t.amount : Number(t.amount) || 0
+      const row = wsTx.addRow([
+        t.id,
+        t.date,
+        t.type === 'income' ? 'Income' : 'Expense',
+        metadata.landMap.get(t.landId) || 'Unassigned',
+        (t.cropId && metadata.cropMap.get(t.cropId)) || '',
+        metadata.categoryMap.get(t.categoryId) || 'Uncategorized',
+        t.description || '',
+        numericAmount,
+        t.paymentMethod || '',
+        t.referenceNumber || '',
+        t.notes || '',
+        t.createdAt || '',
+        t.updatedAt || '',
+      ])
+      row.getCell(8).numFmt = '#,##0.00'
     }
 
-    // Set column widths
-    wsTx['!cols'] = [
-      { wch: 38 }, // Transaction ID
-      { wch: 16 }, // Transaction Date
-      { wch: 16 }, // Transaction Type
-      { wch: 24 }, // Cultivation Land / Area
-      { wch: 20 }, // Associated Crop
-      { wch: 24 }, // Category
-      { wch: 35 }, // Description
-      { wch: 18 }, // Amount (LKR)
-      { wch: 18 }, // Payment Method
-      { wch: 24 }, // Reference Number
-      { wch: 35 }, // Notes
-      { wch: 24 }, // Created At
-      { wch: 24 }, // Updated At
-    ]
-
-    // Freeze header row
-    wsTx['!views'] = [{ state: 'frozen', ySplit: 1 }]
-
-    // Autofilter range
-    const maxRow = Math.max(1, txRows.length + 1)
-    wsTx['!autofilter'] = {
-      ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxRow - 1, c: txHeaders.length - 1 } }),
+    const maxRow = Math.max(1, transactions.length + 1)
+    wsTx.autoFilter = {
+      from: { row: 1, column: 1 },
+      to: { row: maxRow, column: txHeaders.length },
     }
-
-    XLSX.utils.book_append_sheet(wb, wsTx, 'Transactions')
   }
 
   // --------------------------------------------------------------------------
   // SHEET 2: Fertilizer Applications
   // --------------------------------------------------------------------------
   if (payload.options.dataType === 'all' || payload.options.dataType === 'fertilizer') {
+    const wsFert = wb.addWorksheet('Fertilizer Applications', {
+      views: [{ state: 'frozen', ySplit: 1 }],
+    })
+
     const fertHeaders = [
       'Application ID',
       'Cultivation Land / Area',
@@ -548,8 +534,18 @@ export function buildExcelWorkbook(payload: ExportPayload): XLSX.WorkBook {
       'Updated At',
     ]
 
-    const fertRows = fertilizerApplications.map((app) => {
-      // Calculate human reminder status
+    const fertWidths = [38, 24, 20, 26, 16, 18, 16, 12, 10, 16, 18, 26, 35, 24, 24]
+    wsFert.columns = fertHeaders.map((header, idx) => ({
+      header,
+      key: `col_${idx}`,
+      width: fertWidths[idx],
+    }))
+
+    wsFert.getRow(1).eachCell((cell) => {
+      cell.style = headerStyle
+    })
+
+    for (const app of fertilizerApplications) {
       let reminderStatus = 'Scheduled'
       if (app.status === 'completed') {
         reminderStatus = 'Completed'
@@ -568,7 +564,10 @@ export function buildExcelWorkbook(payload: ExportPayload): XLSX.WorkBook {
         }
       }
 
-      return [
+      const qtyVal = app.quantity !== undefined && app.quantity !== null ? Number(app.quantity) : ''
+      const costVal = app.cost !== undefined && app.cost !== null ? Number(app.cost) : ''
+
+      const row = wsFert.addRow([
         app.id,
         metadata.landMap.get(app.landId) || 'Unassigned',
         metadata.cropMap.get(app.cropId) || 'Unassigned',
@@ -576,9 +575,9 @@ export function buildExcelWorkbook(payload: ExportPayload): XLSX.WorkBook {
         app.applicationDate,
         app.reminderInterval ? getReminderIntervalLabel(app.reminderInterval) : '',
         app.nextDueDate || '',
-        app.quantity !== undefined && app.quantity !== null ? Number(app.quantity) : '',
+        qtyVal,
         app.unit || '',
-        app.cost !== undefined && app.cost !== null ? Number(app.cost) : '',
+        costVal,
         app.status === 'completed'
           ? 'Completed'
           : app.status === 'cancelled'
@@ -588,53 +587,18 @@ export function buildExcelWorkbook(payload: ExportPayload): XLSX.WorkBook {
         app.notes || '',
         app.createdAt || '',
         app.updatedAt || '',
-      ]
-    })
+      ])
 
-    const wsFert = XLSX.utils.aoa_to_sheet([fertHeaders, ...fertRows])
-
-    // Format Quantity (col H = index 7) and Cost (col J = index 9)
-    for (let r = 1; r <= fertRows.length; r++) {
-      const qtyCell = `H${r + 1}`
-      const costCell = `J${r + 1}`
-      if (wsFert[qtyCell] && typeof wsFert[qtyCell].v === 'number') {
-        wsFert[qtyCell].t = 'n'
-      }
-      if (wsFert[costCell] && typeof wsFert[costCell].v === 'number') {
-        wsFert[costCell].t = 'n'
-        wsFert[costCell].z = '#,##0.00'
+      if (typeof costVal === 'number') {
+        row.getCell(10).numFmt = '#,##0.00'
       }
     }
 
-    // Set column widths
-    wsFert['!cols'] = [
-      { wch: 38 }, // Application ID
-      { wch: 24 }, // Cultivation Land / Area
-      { wch: 20 }, // Target Crop
-      { wch: 26 }, // Fertilizer Product
-      { wch: 16 }, // Application Date
-      { wch: 18 }, // Reminder Interval
-      { wch: 16 }, // Next Due Date
-      { wch: 12 }, // Quantity
-      { wch: 10 }, // Unit
-      { wch: 16 }, // Cost (LKR)
-      { wch: 18 }, // Application Status
-      { wch: 26 }, // Reminder Status
-      { wch: 35 }, // Notes
-      { wch: 24 }, // Created At
-      { wch: 24 }, // Updated At
-    ]
-
-    // Freeze header row
-    wsFert['!views'] = [{ state: 'frozen', ySplit: 1 }]
-
-    // Autofilter range
-    const maxRow = Math.max(1, fertRows.length + 1)
-    wsFert['!autofilter'] = {
-      ref: XLSX.utils.encode_range({ s: { r: 0, c: 0 }, e: { r: maxRow - 1, c: fertHeaders.length - 1 } }),
+    const maxRow = Math.max(1, fertilizerApplications.length + 1)
+    wsFert.autoFilter = {
+      from: { row: 1, column: 1 },
+      to: { row: maxRow, column: fertHeaders.length },
     }
-
-    XLSX.utils.book_append_sheet(wb, wsFert, 'Fertilizer Applications')
   }
 
   // --------------------------------------------------------------------------
@@ -654,6 +618,9 @@ export function buildExcelWorkbook(payload: ExportPayload): XLSX.WorkBook {
   totalIncome = Math.round(totalIncome * 100) / 100
   totalExpenses = Math.round(totalExpenses * 100) / 100
   const netBalance = Math.round((totalIncome - totalExpenses) * 100) / 100
+
+  const wsSummary = wb.addWorksheet('Export Summary')
+  wsSummary.columns = [{ width: 36 }, { width: 42 }]
 
   const summaryData: (string | number)[][] = [
     ['AgriFlow – Agriculture Management System', ''],
@@ -677,30 +644,27 @@ export function buildExcelWorkbook(payload: ExportPayload): XLSX.WorkBook {
     ['Net Balance (LKR)', netBalance],
   ]
 
-  const wsSummary = XLSX.utils.aoa_to_sheet(summaryData)
+  for (const rowValues of summaryData) {
+    wsSummary.addRow(rowValues)
+  }
 
-  // Format currency cells in Summary (rows 17, 18, 19 -> cells B17, B18, B19)
+  wsSummary.getRow(1).font = { bold: true, size: 13 }
+  wsSummary.getRow(4).font = { bold: true }
+  wsSummary.getRow(13).font = { bold: true }
   ;['B17', 'B18', 'B19'].forEach((cellRef) => {
-    if (wsSummary[cellRef]) {
-      wsSummary[cellRef].t = 'n'
-      wsSummary[cellRef].z = '#,##0.00'
-    }
+    wsSummary.getCell(cellRef).numFmt = '#,##0.00'
   })
-
-  wsSummary['!cols'] = [{ wch: 36 }, { wch: 42 }]
-
-  XLSX.utils.book_append_sheet(wb, wsSummary, 'Export Summary')
 
   return wb
 }
 
 /**
- * Triggers native browser download of generated Excel workbook.
+ * Triggers native browser download of generated ExcelJS workbook.
  * Frees temporary object URL to prevent memory leaks.
  */
-export function triggerExcelDownload(wb: XLSX.WorkBook, filename?: string): void {
+export async function triggerExcelDownload(wb: ExcelJS.Workbook, filename?: string): Promise<void> {
   const finalFilename = filename || getExportFilename()
-  const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' })
+  const excelBuffer = await wb.xlsx.writeBuffer()
 
   const blob = new Blob([excelBuffer], {
     type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;charset=UTF-8',
@@ -714,7 +678,6 @@ export function triggerExcelDownload(wb: XLSX.WorkBook, filename?: string): void
   anchor.click()
   document.body.removeChild(anchor)
 
-  // Release memory
   setTimeout(() => {
     URL.revokeObjectURL(url)
   }, 1000)

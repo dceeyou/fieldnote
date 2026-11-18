@@ -115,11 +115,11 @@ export function ExportModal({ isOpen, onClose, initialDataType = 'all' }: Export
       const payload = await loadExportPayload(options)
 
       // 2. Build Excel workbook (.xlsx) with 3 worksheets
-      const workbook = buildExcelWorkbook(payload)
+      const workbook = await buildExcelWorkbook(payload)
 
       // 3. Trigger download and free memory
       const filename = getExportFilename()
-      triggerExcelDownload(workbook, filename)
+      await triggerExcelDownload(workbook, filename)
 
       setExportSuccess(`Successfully generated and downloaded ${filename}`)
     } catch (err: unknown) {

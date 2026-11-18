@@ -30,3 +30,19 @@ export interface FertilizerApplication extends Timestamped {
 }
 export interface ImportBatch { id: string; fileName: string; fileType: string; importedAt: string; totalRows: number; importedRows: number; skippedRows: number; status: string; notes?: string }
 export interface Setting { key: string; value: unknown }
+
+export type SyncableTable =
+  | 'lands'
+  | 'crops'
+  | 'land_crops'
+  | 'categories'
+  | 'fertilizers'
+  | 'transactions'
+  | 'fertilizer_applications'
+
+export interface SyncDeletion {
+  id: string
+  tableName: SyncableTable
+  recordId: string
+  deletedAt: string
+}

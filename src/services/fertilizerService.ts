@@ -1,7 +1,7 @@
 import { db } from '../data/db/database.ts'
 import type { Fertilizer } from '../data/db/schema.ts'
 import { fertilizerInputSchema, type FertilizerInput } from '../domain/validation.ts'
-import { supabase } from '../lib/supabase.ts'
+import { syncUpsertRecord, syncDeleteRecord } from './syncService.ts'
 
 export async function getAllFertilizers(includeInactive = false): Promise<Fertilizer[]> {
   if (includeInactive) {
@@ -43,24 +43,7 @@ export async function saveFertilizer(input: FertilizerInput, id?: string): Promi
     await db.fertilizers.add(fertilizerRecord)
   }
 
-  // Direct Supabase synchronization if configured
-  if (supabase) {
-    try {
-      const row = {
-        id: fertilizerRecord.id,
-        name: fertilizerRecord.name,
-        type: fertilizerRecord.type ?? null,
-        default_unit: fertilizerRecord.defaultUnit ?? null,
-        notes: fertilizerRecord.notes ?? null,
-        is_active: fertilizerRecord.isActive,
-        created_at: fertilizerRecord.createdAt,
-        updated_at: fertilizerRecord.updatedAt,
-      }
-      await supabase.from('fertilizers').upsert(row)
-    } catch (err) {
-      console.warn('Direct Supabase sync warning:', err)
-    }
-  }
+  await syncUpsertRecord('fertilizers', fertilizerRecord as unknown as Record<string, unknown>)
 
   return fertilizerRecord
 }
@@ -71,13 +54,9 @@ export async function deactivateFertilizer(id: string): Promise<void> {
     isActive: false,
     updatedAt: now,
   })
-
-  if (supabase) {
-    try {
-      await supabase.from('fertilizers').update({ is_active: false, updated_at: now }).eq('id', id)
-    } catch (err) {
-      console.warn('Direct Supabase deactivate warning:', err)
-    }
+  const updated = await db.fertilizers.get(id)
+  if (updated) {
+    await syncUpsertRecord('fertilizers', updated as unknown as Record<string, unknown>)
   }
 }
 
@@ -96,14 +75,7 @@ export async function deleteFertilizer(
   }
 
   await db.fertilizers.delete(id)
-
-  if (supabase) {
-    try {
-      await supabase.from('fertilizers').delete().eq('id', id)
-    } catch (err) {
-      console.warn('Direct Supabase delete warning:', err)
-    }
-  }
+  await syncDeleteRecord('fertilizers', id)
 
   return {
     deleted: true,

@@ -29,6 +29,15 @@ describe('Vercel Deployment Integration & Configuration', () => {
       (header: { key: string }) => header.key.toLowerCase() === 'cache-control'
     )
     assert.ok(cacheControl, 'Cache-Control header for /sw.js must be present')
+
+    // Verify HTTP Security Headers on global route
+    const globalHeaders = config.headers.find((h: { source: string }) => h.source === '/(.*)')
+    assert.ok(globalHeaders, 'Global security headers rule must exist in vercel.json')
+    const headerKeys = globalHeaders.headers.map((h: { key: string }) => h.key.toLowerCase())
+    assert.ok(headerKeys.includes('x-content-type-options'), 'Must set X-Content-Type-Options')
+    assert.ok(headerKeys.includes('x-frame-options'), 'Must set X-Frame-Options')
+    assert.ok(headerKeys.includes('referrer-policy'), 'Must set Referrer-Policy')
+    assert.ok(headerKeys.includes('content-security-policy'), 'Must set Content-Security-Policy')
   })
 
   it('.gitignore excludes .vercel, sensitive env files, and build outputs', () => {

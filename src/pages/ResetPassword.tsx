@@ -46,8 +46,8 @@ export function ResetPassword() {
     if (!password) {
       setPasswordError('Password is required')
       valid = false
-    } else if (password.length < 6) {
-      setPasswordError('Password must be at least 6 characters long')
+    } else if (password.length < 8) {
+      setPasswordError('Password must be at least 8 characters long')
       valid = false
     }
 
@@ -206,7 +206,7 @@ export function ResetPassword() {
                       setPassword(e.target.value)
                       if (passwordError) setPasswordError(null)
                     }}
-                    placeholder="At least 6 characters"
+                    placeholder="At least 8 characters"
                     className="w-full bg-transparent h-full px-2.5 text-sm text-text placeholder:text-muted border-0 outline-none focus:outline-none focus:ring-0"
                   />
                   <button

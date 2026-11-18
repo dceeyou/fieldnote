@@ -111,14 +111,14 @@ alter table public.fertilizers enable row level security;
 alter table public.transactions enable row level security;
 alter table public.fertilizer_applications enable row level security;
 
--- Strict single-user administrator policies (authenticated only; anon/unauthenticated requests are denied)
-create policy "Authenticated access to lands" on public.lands for all to authenticated using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "Authenticated access to crops" on public.crops for all to authenticated using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "Authenticated access to land_crops" on public.land_crops for all to authenticated using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "Authenticated access to categories" on public.categories for all to authenticated using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "Authenticated access to fertilizers" on public.fertilizers for all to authenticated using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "Authenticated access to transactions" on public.transactions for all to authenticated using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
-create policy "Authenticated access to fertilizer_applications" on public.fertilizer_applications for all to authenticated using (auth.role() = 'authenticated') with check (auth.role() = 'authenticated');
+-- Strict single-user administrator policies (authenticated non-anonymous sessions only; anon denied)
+create policy "Authenticated access to lands" on public.lands for all to authenticated using ((select auth.uid()) is not null and (select auth.jwt()->>'is_anonymous') is distinct from 'true') with check ((select auth.uid()) is not null and (select auth.jwt()->>'is_anonymous') is distinct from 'true');
+create policy "Authenticated access to crops" on public.crops for all to authenticated using ((select auth.uid()) is not null and (select auth.jwt()->>'is_anonymous') is distinct from 'true') with check ((select auth.uid()) is not null and (select auth.jwt()->>'is_anonymous') is distinct from 'true');
+create policy "Authenticated access to land_crops" on public.land_crops for all to authenticated using ((select auth.uid()) is not null and (select auth.jwt()->>'is_anonymous') is distinct from 'true') with check ((select auth.uid()) is not null and (select auth.jwt()->>'is_anonymous') is distinct from 'true');
+create policy "Authenticated access to categories" on public.categories for all to authenticated using ((select auth.uid()) is not null and (select auth.jwt()->>'is_anonymous') is distinct from 'true') with check ((select auth.uid()) is not null and (select auth.jwt()->>'is_anonymous') is distinct from 'true');
+create policy "Authenticated access to fertilizers" on public.fertilizers for all to authenticated using ((select auth.uid()) is not null and (select auth.jwt()->>'is_anonymous') is distinct from 'true') with check ((select auth.uid()) is not null and (select auth.jwt()->>'is_anonymous') is distinct from 'true');
+create policy "Authenticated access to transactions" on public.transactions for all to authenticated using ((select auth.uid()) is not null and (select auth.jwt()->>'is_anonymous') is distinct from 'true') with check ((select auth.uid()) is not null and (select auth.jwt()->>'is_anonymous') is distinct from 'true');
+create policy "Authenticated access to fertilizer_applications" on public.fertilizer_applications for all to authenticated using ((select auth.uid()) is not null and (select auth.jwt()->>'is_anonymous') is distinct from 'true') with check ((select auth.uid()) is not null and (select auth.jwt()->>'is_anonymous') is distinct from 'true');
 
 -- Indexes for optimal query performance
 create index if not exists idx_transactions_date on public.transactions(date desc);

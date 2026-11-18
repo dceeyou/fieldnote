@@ -1,5 +1,5 @@
 import Dexie, { type EntityTable } from 'dexie'
-import type { Category, Crop, Fertilizer, FertilizerApplication, ImportBatch, Land, LandCrop, Setting, Transaction } from './schema'
+import type { Category, Crop, Fertilizer, FertilizerApplication, ImportBatch, Land, LandCrop, Setting, SyncDeletion, Transaction } from './schema'
 
 export class AgricultureDatabase extends Dexie {
   lands!: EntityTable<Land, 'id'>
@@ -11,6 +11,7 @@ export class AgricultureDatabase extends Dexie {
   fertilizerApplications!: EntityTable<FertilizerApplication, 'id'>
   importBatches!: EntityTable<ImportBatch, 'id'>
   settings!: EntityTable<Setting, 'key'>
+  syncDeletions!: EntityTable<SyncDeletion, 'id'>
 
   constructor() {
     super('AgricultureManagement')
@@ -24,6 +25,9 @@ export class AgricultureDatabase extends Dexie {
       fertilizerApplications: 'id, landId, cropId, fertilizerId, applicationDate, nextDueDate, status',
       importBatches: 'id, importedAt, status',
       settings: 'key',
+    })
+    this.version(2).stores({
+      syncDeletions: 'id, tableName, recordId, deletedAt',
     })
   }
 }

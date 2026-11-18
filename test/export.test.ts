@@ -1,6 +1,6 @@
 import { describe, it } from 'node:test'
 import assert from 'node:assert'
-import * as XLSX from 'xlsx'
+import ExcelJS from 'exceljs'
 import {
   computeExportDateBounds,
   getExportFilename,
@@ -56,7 +56,16 @@ describe('Export Configuration & Date Presets', () => {
   })
 })
 
-describe('Excel Workbook Generation (Three Worksheets)', () => {
+function extractSheetRows(ws: ExcelJS.Worksheet): (string | number | undefined)[][] {
+  const rows: (string | number | undefined)[][] = []
+  ws.eachRow((row) => {
+    const vals = row.values as (string | number | undefined)[]
+    rows.push(vals.slice(1))
+  })
+  return rows
+}
+
+describe('Excel Workbook Generation (ExcelJS Three Worksheets)', () => {
   const metadata: ExportMetadata = {
     landMap: new Map([
       ['land-1', 'Main Estate'],
@@ -158,102 +167,96 @@ describe('Excel Workbook Generation (Three Worksheets)', () => {
     dateRangeSpan: 'All available records in database',
   }
 
-  it('builds an Excel workbook containing three distinct worksheets', () => {
-    const wb = buildExcelWorkbook(payload)
-    assert.deepStrictEqual(wb.SheetNames, [
-      'Transactions',
-      'Fertilizer Applications',
-      'Export Summary',
-    ])
+  it('builds an Excel workbook containing three distinct worksheets', async () => {
+    const wb = await buildExcelWorkbook(payload)
+    assert.deepStrictEqual(
+      wb.worksheets.map((s) => s.name),
+      ['Transactions', 'Fertilizer Applications', 'Export Summary']
+    )
   })
 
-  it('correctly constructs Sheet 1 (Transactions) with required 13 columns and numeric amounts', () => {
-    const wb = buildExcelWorkbook(payload)
-    const ws = wb.Sheets['Transactions']
+  it('correctly constructs Sheet 1 (Transactions) with required 13 columns and numeric amounts', async () => {
+    const wb = await buildExcelWorkbook(payload)
+    const ws = wb.getWorksheet('Transactions')
     assert.ok(ws, 'Transactions worksheet should exist')
 
     // Verify Headers (Row 1)
-    assert.strictEqual(ws['A1'].v, 'Transaction ID')
-    assert.strictEqual(ws['B1'].v, 'Transaction Date')
-    assert.strictEqual(ws['C1'].v, 'Transaction Type')
-    assert.strictEqual(ws['D1'].v, 'Cultivation Land / Area')
-    assert.strictEqual(ws['E1'].v, 'Associated Crop')
-    assert.strictEqual(ws['F1'].v, 'Category')
-    assert.strictEqual(ws['G1'].v, 'Description')
-    assert.strictEqual(ws['H1'].v, 'Amount (LKR)')
-    assert.strictEqual(ws['I1'].v, 'Payment Method')
-    assert.strictEqual(ws['J1'].v, 'Invoice / Reference Number')
-    assert.strictEqual(ws['K1'].v, 'Notes')
-    assert.strictEqual(ws['L1'].v, 'Created At')
-    assert.strictEqual(ws['M1'].v, 'Updated At')
+    assert.strictEqual(ws.getCell('A1').value, 'Transaction ID')
+    assert.strictEqual(ws.getCell('B1').value, 'Transaction Date')
+    assert.strictEqual(ws.getCell('C1').value, 'Transaction Type')
+    assert.strictEqual(ws.getCell('D1').value, 'Cultivation Land / Area')
+    assert.strictEqual(ws.getCell('E1').value, 'Associated Crop')
+    assert.strictEqual(ws.getCell('F1').value, 'Category')
+    assert.strictEqual(ws.getCell('G1').value, 'Description')
+    assert.strictEqual(ws.getCell('H1').value, 'Amount (LKR)')
+    assert.strictEqual(ws.getCell('I1').value, 'Payment Method')
+    assert.strictEqual(ws.getCell('J1').value, 'Invoice / Reference Number')
+    assert.strictEqual(ws.getCell('K1').value, 'Notes')
+    assert.strictEqual(ws.getCell('L1').value, 'Created At')
+    assert.strictEqual(ws.getCell('M1').value, 'Updated At')
 
     // Verify Row 2 Data resolution
-    assert.strictEqual(ws['A2'].v, 'tx-1')
-    assert.strictEqual(ws['B2'].v, '2026-11-10')
-    assert.strictEqual(ws['C2'].v, 'Income')
-    assert.strictEqual(ws['D2'].v, 'Main Estate')
-    assert.strictEqual(ws['E2'].v, 'Ginger')
-    assert.strictEqual(ws['F2'].v, 'Harvest Sales')
-    assert.strictEqual(ws['H2'].v, 150000)
-    assert.strictEqual(ws['H2'].t, 'n') // Numeric cell type
-    assert.strictEqual(ws['H2'].z, '#,##0.00') // Currency format
+    assert.strictEqual(ws.getCell('A2').value, 'tx-1')
+    assert.strictEqual(ws.getCell('B2').value, '2026-11-10')
+    assert.strictEqual(ws.getCell('C2').value, 'Income')
+    assert.strictEqual(ws.getCell('D2').value, 'Main Estate')
+    assert.strictEqual(ws.getCell('E2').value, 'Ginger')
+    assert.strictEqual(ws.getCell('F2').value, 'Harvest Sales')
+    assert.strictEqual(ws.getCell('H2').value, 150000)
+    assert.strictEqual(typeof ws.getCell('H2').value, 'number')
+    assert.strictEqual(ws.getCell('H2').numFmt, '#,##0.00')
 
     // Verify Row 3 with optional fields left blank
-    assert.strictEqual(ws['A3'].v, 'tx-2')
-    assert.strictEqual(ws['C3'].v, 'Expense')
-    assert.strictEqual(ws['D3'].v, 'Highland Plot')
-    assert.strictEqual(ws['E3'].v, '') // Crop not assigned
-    assert.strictEqual(ws['H3'].v, 45000)
-    assert.strictEqual(ws['H3'].t, 'n')
+    assert.strictEqual(ws.getCell('A3').value, 'tx-2')
+    assert.strictEqual(ws.getCell('C3').value, 'Expense')
+    assert.strictEqual(ws.getCell('D3').value, 'Highland Plot')
+    assert.strictEqual(ws.getCell('E3').value, '')
+    assert.strictEqual(ws.getCell('H3').value, 45000)
+    assert.strictEqual(typeof ws.getCell('H3').value, 'number')
 
     // Verify Freeze Panes & Autofilter
-    assert.ok(ws['!views'], 'Freeze panes should be configured')
-    assert.ok(ws['!autofilter'], 'Autofilter should be configured')
+    assert.ok(ws.views && ws.views.length > 0 && ws.views[0].state === 'frozen', 'Freeze panes should be configured')
+    assert.ok(ws.autoFilter, 'Autofilter should be configured')
   })
 
-  it('correctly constructs Sheet 2 (Fertilizer Applications) with required 15 columns and status', () => {
-    const wb = buildExcelWorkbook(payload)
-    const ws = wb.Sheets['Fertilizer Applications']
+  it('correctly constructs Sheet 2 (Fertilizer Applications) with required 15 columns and status', async () => {
+    const wb = await buildExcelWorkbook(payload)
+    const ws = wb.getWorksheet('Fertilizer Applications')
     assert.ok(ws, 'Fertilizer Applications worksheet should exist')
 
-    // Verify Headers
-    assert.strictEqual(ws['A1'].v, 'Application ID')
-    assert.strictEqual(ws['D1'].v, 'Fertilizer Product')
-    assert.strictEqual(ws['F1'].v, 'Reminder Interval')
-    assert.strictEqual(ws['H1'].v, 'Quantity')
-    assert.strictEqual(ws['J1'].v, 'Cost (LKR)')
-    assert.strictEqual(ws['K1'].v, 'Application Status')
-    assert.strictEqual(ws['L1'].v, 'Reminder Status')
+    assert.strictEqual(ws.getCell('A1').value, 'Application ID')
+    assert.strictEqual(ws.getCell('D1').value, 'Fertilizer Product')
+    assert.strictEqual(ws.getCell('F1').value, 'Reminder Interval')
+    assert.strictEqual(ws.getCell('H1').value, 'Quantity')
+    assert.strictEqual(ws.getCell('J1').value, 'Cost (LKR)')
+    assert.strictEqual(ws.getCell('K1').value, 'Application Status')
+    assert.strictEqual(ws.getCell('L1').value, 'Reminder Status')
 
-    // Verify Row 2 Data
-    assert.strictEqual(ws['A2'].v, 'app-1')
-    assert.strictEqual(ws['B2'].v, 'Main Estate')
-    assert.strictEqual(ws['C2'].v, 'Ginger')
-    assert.strictEqual(ws['D2'].v, 'Urea 46%')
-    assert.strictEqual(ws['E2'].v, '2026-11-01')
-    assert.strictEqual(ws['F2'].v, '1 Month')
-    assert.strictEqual(ws['G2'].v, '2026-12-01')
-    assert.strictEqual(ws['H2'].v, 50)
-    assert.strictEqual(ws['H2'].t, 'n')
-    assert.strictEqual(ws['J2'].v, 18000)
-    assert.strictEqual(ws['J2'].t, 'n')
-    assert.strictEqual(ws['K2'].v, 'Scheduled')
+    assert.strictEqual(ws.getCell('A2').value, 'app-1')
+    assert.strictEqual(ws.getCell('B2').value, 'Main Estate')
+    assert.strictEqual(ws.getCell('C2').value, 'Ginger')
+    assert.strictEqual(ws.getCell('D2').value, 'Urea 46%')
+    assert.strictEqual(ws.getCell('E2').value, '2026-11-01')
+    assert.strictEqual(ws.getCell('F2').value, '1 Month')
+    assert.strictEqual(ws.getCell('G2').value, '2026-12-01')
+    assert.strictEqual(ws.getCell('H2').value, 50)
+    assert.strictEqual(typeof ws.getCell('H2').value, 'number')
+    assert.strictEqual(ws.getCell('J2').value, 18000)
+    assert.strictEqual(typeof ws.getCell('J2').value, 'number')
+    assert.strictEqual(ws.getCell('J2').numFmt, '#,##0.00')
+    assert.strictEqual(ws.getCell('K2').value, 'Scheduled')
 
-    // Verify Row 3 Completed status
-    assert.strictEqual(ws['A3'].v, 'app-2')
-    assert.strictEqual(ws['K3'].v, 'Completed')
-    assert.strictEqual(ws['L3'].v, 'Completed')
+    assert.strictEqual(ws.getCell('A3').value, 'app-2')
+    assert.strictEqual(ws.getCell('K3').value, 'Completed')
+    assert.strictEqual(ws.getCell('L3').value, 'Completed')
   })
 
-  it('correctly calculates financial totals in Sheet 3 (Export Summary)', () => {
-    const wb = buildExcelWorkbook(payload)
-    const ws = wb.Sheets['Export Summary']
+  it('correctly calculates financial totals in Sheet 3 (Export Summary)', async () => {
+    const wb = await buildExcelWorkbook(payload)
+    const ws = wb.getWorksheet('Export Summary')
     assert.ok(ws, 'Export Summary worksheet should exist')
 
-    // Convert sheet to json array of arrays
-    const rows = XLSX.utils.sheet_to_json<(string | number)[]>(ws, { header: 1 })
-
-    // Find summary property rows
+    const rows = extractSheetRows(ws)
     const appNameRow = rows.find((r) => r[0] === 'Application Name')
     const reportTitleRow = rows.find((r) => r[0] === 'Report Title')
     const txCountRow = rows.find((r) => r[0] === 'Transaction Records Exported')
@@ -270,59 +273,57 @@ describe('Excel Workbook Generation (Three Worksheets)', () => {
     assert.strictEqual(totalCountRow?.[1], 4)
     assert.strictEqual(incomeRow?.[1], 150000)
     assert.strictEqual(expenseRow?.[1], 45000)
-    assert.strictEqual(netBalanceRow?.[1], 105000) // 150000 - 45000
+    assert.strictEqual(netBalanceRow?.[1], 105000)
   })
 
-  it('exports successfully when only transactions exist', () => {
+  it('exports successfully when only transactions exist', async () => {
     const txOnlyPayload: ExportPayload = {
       ...payload,
       options: { dataType: 'transactions', datePreset: 'all_records' },
       fertilizerApplications: [],
     }
-    const wb = buildExcelWorkbook(txOnlyPayload)
-    assert.ok(wb.SheetNames.includes('Transactions'))
-    assert.ok(wb.SheetNames.includes('Export Summary'))
-    assert.ok(!wb.SheetNames.includes('Fertilizer Applications'))
+    const wb = await buildExcelWorkbook(txOnlyPayload)
+    const names = wb.worksheets.map((s) => s.name)
+    assert.ok(names.includes('Transactions'))
+    assert.ok(names.includes('Export Summary'))
+    assert.ok(!names.includes('Fertilizer Applications'))
 
-    const wsSummary = wb.Sheets['Export Summary']
-    const rows = XLSX.utils.sheet_to_json<(string | number)[]>(wsSummary, { header: 1 })
-    const txCountRow = rows.find((r) => r[0] === 'Transaction Records Exported')
-    const fertCountRow = rows.find((r) => r[0] === 'Fertilizer Application Records Exported')
-    assert.strictEqual(txCountRow?.[1], 2)
-    assert.strictEqual(fertCountRow?.[1], 0)
+    const wsSummary = wb.getWorksheet('Export Summary')!
+    const rows = extractSheetRows(wsSummary)
+    assert.strictEqual(rows.find((r) => r[0] === 'Transaction Records Exported')?.[1], 2)
+    assert.strictEqual(rows.find((r) => r[0] === 'Fertilizer Application Records Exported')?.[1], 0)
   })
 
-  it('exports successfully when only fertilizer applications exist', () => {
+  it('exports successfully when only fertilizer applications exist', async () => {
     const fertOnlyPayload: ExportPayload = {
       ...payload,
       options: { dataType: 'fertilizer', datePreset: 'all_records' },
       transactions: [],
     }
-    const wb = buildExcelWorkbook(fertOnlyPayload)
-    assert.ok(wb.SheetNames.includes('Fertilizer Applications'))
-    assert.ok(wb.SheetNames.includes('Export Summary'))
-    assert.ok(!wb.SheetNames.includes('Transactions'))
+    const wb = await buildExcelWorkbook(fertOnlyPayload)
+    const names = wb.worksheets.map((s) => s.name)
+    assert.ok(names.includes('Fertilizer Applications'))
+    assert.ok(names.includes('Export Summary'))
+    assert.ok(!names.includes('Transactions'))
 
-    const wsSummary = wb.Sheets['Export Summary']
-    const rows = XLSX.utils.sheet_to_json<(string | number)[]>(wsSummary, { header: 1 })
-    const txCountRow = rows.find((r) => r[0] === 'Transaction Records Exported')
-    const fertCountRow = rows.find((r) => r[0] === 'Fertilizer Application Records Exported')
-    assert.strictEqual(txCountRow?.[1], 0)
-    assert.strictEqual(fertCountRow?.[1], 2)
+    const wsSummary = wb.getWorksheet('Export Summary')!
+    const rows = extractSheetRows(wsSummary)
+    assert.strictEqual(rows.find((r) => r[0] === 'Transaction Records Exported')?.[1], 0)
+    assert.strictEqual(rows.find((r) => r[0] === 'Fertilizer Application Records Exported')?.[1], 2)
   })
 
-  it('serializes workbook to valid .xlsx binary without corruption', () => {
-    const wb = buildExcelWorkbook(payload)
-    const buf = XLSX.write(wb, { type: 'buffer', bookType: 'xlsx' })
-    assert.ok(buf instanceof Buffer)
-    assert.ok(buf.length > 5000, 'Excel workbook binary should exceed 5KB')
+  it('serializes workbook to valid .xlsx binary without corruption', async () => {
+    const wb = await buildExcelWorkbook(payload)
+    const buf = await wb.xlsx.writeBuffer()
+    assert.ok(buf.byteLength > 5000, 'Excel workbook binary should exceed 5KB')
 
-    // Read back workbook to verify integrity
-    const readWb = XLSX.read(buf, { type: 'buffer' })
-    assert.deepStrictEqual(readWb.SheetNames, [
-      'Transactions',
-      'Fertilizer Applications',
-      'Export Summary',
-    ])
+    // Reload workbook from binary buffer to verify integrity
+    const readWb = new ExcelJS.Workbook()
+    await readWb.xlsx.load(buf)
+    assert.deepStrictEqual(
+      readWb.worksheets.map((s) => s.name),
+      ['Transactions', 'Fertilizer Applications', 'Export Summary']
+    )
+    assert.strictEqual(readWb.getWorksheet('Transactions')?.getCell('A2').value, 'tx-1')
   })
 })

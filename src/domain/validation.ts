@@ -99,7 +99,7 @@ export type ResetPasswordRequestInput = z.infer<typeof resetPasswordRequestSchem
 
 export const updatePasswordSchema = z
   .object({
-    password: z.string().min(6, 'Password must be at least 6 characters long'),
+    password: z.string().min(8, 'Password must be at least 8 characters long'),
     confirmPassword: z.string().min(1, 'Please confirm your password'),
   })
   .refine((data) => data.password === data.confirmPassword, {

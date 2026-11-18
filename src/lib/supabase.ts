@@ -21,6 +21,22 @@ export const isSupabaseConfigured = Boolean(
 )
 
 /**
+ * Derives the exact Supabase Auth storage key (`sb-<project-ref>-auth-token`)
+ * from a Supabase project URL for reliable session cleanup on sign-out.
+ */
+export function getSupabaseAuthStorageKey(url: string): string | null {
+  if (!url) return null
+  try {
+    const parsed = new URL(url)
+    const projectRef = parsed.hostname.split('.')[0]
+    if (!projectRef) return null
+    return `sb-${projectRef}-auth-token`
+  } catch {
+    return null
+  }
+}
+
+/**
  * Dual Cookie & LocalStorage Storage Adapter.
  * Ensures session tokens persist across desktop PWA launches, browser restarts,
  * and page reloads while maintaining cookie compatibility for secure SSR/session verification.

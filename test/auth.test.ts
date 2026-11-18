@@ -8,7 +8,7 @@ import {
   updatePasswordSchema,
   formatAuthError,
 } from '../src/domain/validation.ts'
-import { secureSessionStorage } from '../src/lib/supabase.ts'
+import { secureSessionStorage, getSupabaseAuthStorageKey } from '../src/lib/supabase.ts'
 
 describe('Single-User Authentication Validation Schemas', () => {
   it('validates correct email and password for login', () => {
@@ -45,7 +45,7 @@ describe('Single-User Authentication Validation Schemas', () => {
     assert.equal(invalid.success, false)
   })
 
-  it('validates password update when passwords match and exceed 6 characters', () => {
+  it('validates password update when passwords match and meet 8-character minimum', () => {
     const valid = updatePasswordSchema.safeParse({
       password: 'NewStrongPassword2026',
       confirmPassword: 'NewStrongPassword2026',
@@ -53,10 +53,10 @@ describe('Single-User Authentication Validation Schemas', () => {
     assert.equal(valid.success, true)
   })
 
-  it('rejects password update when password is shorter than 6 characters', () => {
+  it('rejects password update when password is shorter than 8 characters', () => {
     const short = updatePasswordSchema.safeParse({
-      password: '12345',
-      confirmPassword: '12345',
+      password: '1234567',
+      confirmPassword: '1234567',
     })
     assert.equal(short.success, false)
   })
@@ -112,17 +112,34 @@ describe('Dual Storage Session Persistence Adapter', () => {
       secureSessionStorage.removeItem('test_auth_key')
     })
   })
+  it('derives the exact Supabase auth storage key from project URL', () => {
+    assert.equal(
+      getSupabaseAuthStorageKey('https://wucafifrqdesiirqxlww.supabase.co'),
+      'sb-wucafifrqdesiirqxlww-auth-token'
+    )
+    assert.equal(getSupabaseAuthStorageKey(''), null)
+    assert.equal(getSupabaseAuthStorageKey('not-a-valid-url'), null)
+  })
 })
 
 describe('Database Security & RLS Migration Hardening', () => {
-  it('includes RLS enablement and authenticated policies for all 7 application tables', () => {
+  it('includes hardened auth.uid() RLS migration without deprecated auth.role()', () => {
     const migrationPath = path.resolve(
       process.cwd(),
-      'supabase/migrations/20261117_single_user_auth_rls.sql'
+      'supabase/migrations/20261118_harden_rls_auth_uid.sql'
     )
-    assert.equal(fs.existsSync(migrationPath), true, 'RLS migration file must exist')
+    assert.equal(fs.existsSync(migrationPath), true, 'Hardened RLS migration file must exist')
 
     const sqlContent = fs.readFileSync(migrationPath, 'utf8')
+    const executableSql = sqlContent
+      .split('\n')
+      .filter((line) => !line.trim().startsWith('--'))
+      .join('\n')
+    assert.equal(
+      executableSql.includes('auth.role()'),
+      false,
+      'Hardened migration must not use deprecated auth.role() in executable SQL'
+    )
 
     const requiredTables = [
       'lands',
@@ -140,30 +157,30 @@ describe('Database Security & RLS Migration Hardening', () => {
         `Table ${table} must have RLS enabled`
       )
       assert.ok(
-        sqlContent.includes(`drop policy if exists "Allow all operations on ${table}"`),
-        `Table ${table} must drop permissive open policies`
-      )
-      assert.ok(
-        sqlContent.includes(`to authenticated`) &&
-        sqlContent.includes(`(auth.role() = 'authenticated')`),
-        `Table ${table} must have authenticated-only restriction`
+        sqlContent.includes(`on public.${table} for all to authenticated`) &&
+        sqlContent.includes(`(select auth.uid()) is not null`),
+        `Table ${table} must use initPlan auth.uid() authenticated policy`
       )
     }
   })
 
-  it('schema.sql reflects strict single-user authenticated-only policies', () => {
+  it('schema.sql reflects hardened authenticated-only non-anonymous policies', () => {
     const schemaPath = path.resolve(process.cwd(), 'supabase/schema.sql')
     const schemaContent = fs.readFileSync(schemaPath, 'utf8')
 
-    // Must not contain open policies allowing unauthenticated operations
     assert.equal(
       schemaContent.includes('create policy "Allow all operations on transactions"'),
       false,
       'schema.sql must not allow unauthenticated operations on transactions'
     )
+    assert.equal(
+      schemaContent.includes('auth.role()'),
+      false,
+      'schema.sql must not use deprecated auth.role()'
+    )
     assert.ok(
-      schemaContent.includes('to authenticated using (auth.role() = \'authenticated\')'),
-      'schema.sql must restrict policies to authenticated role'
+      schemaContent.includes('(select auth.uid()) is not null'),
+      'schema.sql must restrict policies via initPlan auth.uid()'
     )
   })
 })

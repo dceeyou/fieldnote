@@ -32,6 +32,7 @@ import { FertilizerTracker } from '../pages/FertilizerTracker.tsx'
 import { Dashboard } from '../pages/Dashboard.tsx'
 import { Reports } from '../pages/Reports.tsx'
 import { seedDatabaseIfEmpty } from '../data/db/seed.ts'
+import { syncWorkspace } from '../services/syncService.ts'
 import { MobileBottomNav } from '../components/navigation/MobileBottomNav.tsx'
 import { OfflineIndicator } from '../components/pwa/OfflineIndicator.tsx'
 
@@ -175,7 +176,19 @@ function WorkspaceLayout() {
   const { user, logout } = useAuth()
 
   useEffect(() => {
-    seedDatabaseIfEmpty().catch(console.error)
+    seedDatabaseIfEmpty()
+      .then(() => {
+        if (navigator.onLine) {
+          syncWorkspace().catch(console.warn)
+        }
+      })
+      .catch(console.error)
+
+    const handleOnline = () => {
+      syncWorkspace().catch(console.warn)
+    }
+    window.addEventListener('online', handleOnline)
+    return () => window.removeEventListener('online', handleOnline)
   }, [])
 
   const title =

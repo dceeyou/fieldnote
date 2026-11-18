@@ -1,5 +1,6 @@
 import { db } from '../data/db/database.ts'
 import type { Transaction } from '../data/db/schema.ts'
+import { syncUpsertRecords } from './syncService.ts'
 
 export interface ParsedCsvRow {
   index: number
@@ -165,6 +166,11 @@ export async function saveImportedTransactions(
       status: 'completed',
     })
   })
+
+  await syncUpsertRecords(
+    'transactions',
+    recordsToInsert as unknown as Record<string, unknown>[]
+  )
 
   return recordsToInsert.length
 }

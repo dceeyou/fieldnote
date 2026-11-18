@@ -8,6 +8,7 @@ import {
   type ValidatedCategoryImportRow,
 } from '../domain/category.ts'
 import { supabase, isSupabaseConfigured } from '../lib/supabase.ts'
+import { syncDeleteRecord, syncDeleteRecords, syncUpsertRecords } from './syncService.ts'
 
 export async function getAllCategories(includeInactive = false): Promise<Category[]> {
   const collection = includeInactive
@@ -169,14 +170,7 @@ export async function deleteCategory(
   }
 
   await db.categories.delete(id)
-
-  if (isSupabaseConfigured && supabase) {
-    try {
-      await supabase.from('categories').delete().eq('id', id)
-    } catch {
-      // offline fallback
-    }
-  }
+  await syncDeleteRecord('categories', id)
 
   return { success: true }
 }
@@ -257,27 +251,25 @@ export async function mergeDuplicateCategories(
     throw new Error('Critical: Financial total discrepancy detected after category merge!')
   }
 
-  // Sync to Supabase if configured
+  // Sync to Supabase if configured (with deletion tombstones when deleting duplicates)
   if (isSupabaseConfigured && supabase) {
     try {
-      // 1. Reassign transactions in Supabase
       await supabase
         .from('transactions')
         .update({ category_id: canonicalId })
         .in('category_id', validDuplicateIds)
-
-      // 2. Remove or archive duplicates in Supabase
-      if (actionOnDuplicate === 'delete') {
-        await supabase.from('categories').delete().in('id', validDuplicateIds)
-      } else {
-        await supabase
-          .from('categories')
-          .update({ is_active: false })
-          .in('id', validDuplicateIds)
-      }
     } catch {
       // offline fallback
     }
+  }
+
+  if (actionOnDuplicate === 'delete') {
+    await syncDeleteRecords('categories', validDuplicateIds)
+  } else {
+    const updatedDuplicates = (await db.categories.bulkGet(validDuplicateIds)).filter(
+      (c): c is Category => Boolean(c)
+    )
+    await syncUpsertRecords('categories', updatedDuplicates as unknown as Record<string, unknown>[])
   }
 
   return {

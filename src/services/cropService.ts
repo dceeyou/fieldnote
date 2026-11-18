@@ -1,6 +1,7 @@
 import { db } from '../data/db/database.ts'
 import type { Crop } from '../data/db/schema.ts'
 import { cropInputSchema, type CropInput } from '../domain/validation.ts'
+import { syncUpsertRecord } from './syncService.ts'
 
 export async function getAllCrops(includeInactive = false): Promise<Crop[]> {
   if (includeInactive) {
@@ -32,12 +33,19 @@ export async function saveCrop(input: CropInput, id?: string): Promise<Crop> {
     await db.crops.add(cropRecord)
   }
 
+  await syncUpsertRecord('crops', cropRecord as unknown as Record<string, unknown>)
+
   return cropRecord
 }
 
 export async function deactivateCrop(id: string): Promise<void> {
+  const now = new Date().toISOString()
   await db.crops.update(id, {
     isActive: false,
-    updatedAt: new Date().toISOString(),
+    updatedAt: now,
   })
+  const updated = await db.crops.get(id)
+  if (updated) {
+    await syncUpsertRecord('crops', updated as unknown as Record<string, unknown>)
+  }
 }

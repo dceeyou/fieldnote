@@ -34,19 +34,23 @@ class RootErrorBoundary extends Component<Props, State> {
         <div style={{ padding: '2rem', maxWidth: '600px', margin: '3rem auto', fontFamily: 'sans-serif' }}>
           <h2 style={{ color: '#dc2626' }}>Application Encountered an Error</h2>
           <p style={{ color: '#4b5563', fontSize: '0.9rem' }}>
-            {this.state.error?.message || 'An unexpected error occurred during rendering.'}
+            {import.meta.env.DEV
+              ? this.state.error?.message || 'An unexpected error occurred during rendering.'
+              : 'An unexpected error occurred. Please reload the application to continue.'}
           </p>
-          <pre
-            style={{
-              background: '#f3f4f6',
-              padding: '1rem',
-              borderRadius: '0.5rem',
-              overflow: 'auto',
-              fontSize: '0.8rem',
-            }}
-          >
-            {this.state.error?.stack}
-          </pre>
+          {import.meta.env.DEV && this.state.error?.stack && (
+            <pre
+              style={{
+                background: '#f3f4f6',
+                padding: '1rem',
+                borderRadius: '0.5rem',
+                overflow: 'auto',
+                fontSize: '0.8rem',
+              }}
+            >
+              {this.state.error.stack}
+            </pre>
+          )}
           <button
             onClick={() => window.location.reload()}
             style={{

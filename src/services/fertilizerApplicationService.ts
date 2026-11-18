@@ -4,6 +4,7 @@ import {
   fertilizerApplicationInputSchema,
   type FertilizerApplicationInput,
 } from '../domain/validation.ts'
+import { syncUpsertRecord, syncUpsertRecords, syncDeleteRecord } from './syncService.ts'
 
 export interface FertilizerAppFilters {
   landId?: string
@@ -79,6 +80,11 @@ export async function saveFertilizerApplication(
     await db.fertilizerApplications.add(appRecord)
   }
 
+  await syncUpsertRecord(
+    'fertilizer_applications',
+    appRecord as unknown as Record<string, unknown>
+  )
+
   return appRecord
 }
 
@@ -92,6 +98,7 @@ export async function markApplicationCompleted(
   if (!existing) return
 
   const now = new Date().toISOString()
+  let nextApp: FertilizerApplication | null = null
 
   await db.transaction('rw', db.fertilizerApplications, async () => {
     // Update current application to completed
@@ -103,7 +110,7 @@ export async function markApplicationCompleted(
 
     // If nextDueDate is supplied, automatically create the next scheduled application record
     if (nextDueDate) {
-      const nextApp: FertilizerApplication = {
+      nextApp = {
         id: crypto.randomUUID(),
         landId: existing.landId,
         cropId: existing.cropId,
@@ -122,6 +129,14 @@ export async function markApplicationCompleted(
       await db.fertilizerApplications.add(nextApp)
     }
   })
+
+  const completedRecord = await db.fertilizerApplications.get(id)
+  const toSync: Record<string, unknown>[] = []
+  if (completedRecord) toSync.push(completedRecord as unknown as Record<string, unknown>)
+  if (nextApp) toSync.push(nextApp as unknown as Record<string, unknown>)
+  if (toSync.length > 0) {
+    await syncUpsertRecords('fertilizer_applications', toSync)
+  }
 }
 
 export async function cancelFertilizerApplication(id: string): Promise<void> {
@@ -129,8 +144,16 @@ export async function cancelFertilizerApplication(id: string): Promise<void> {
     status: 'cancelled',
     updatedAt: new Date().toISOString(),
   })
+  const updated = await db.fertilizerApplications.get(id)
+  if (updated) {
+    await syncUpsertRecord(
+      'fertilizer_applications',
+      updated as unknown as Record<string, unknown>
+    )
+  }
 }
 
 export async function deleteFertilizerApplication(id: string): Promise<void> {
   await db.fertilizerApplications.delete(id)
+  await syncDeleteRecord('fertilizer_applications', id)
 }
