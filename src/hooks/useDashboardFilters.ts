@@ -38,10 +38,40 @@ export function computeDatesForPreset(preset: DatePreset): { startDate: string; 
   }
 }
 
-export function useDashboardFilters(initialPreset: DatePreset = 'this_month') {
-  const initialDates = useMemo(() => computeDatesForPreset(initialPreset), [initialPreset])
+export const SESSION_DATE_PRESET_KEY = 'agriflow_session_date_preset'
 
-  const [datePreset, setDatePresetState] = useState<DatePreset>(initialPreset)
+export function getSessionDatePreset(fallback: DatePreset = 'all_time'): DatePreset {
+  if (typeof window === 'undefined' || !window.sessionStorage) return fallback
+  try {
+    const saved = window.sessionStorage.getItem(SESSION_DATE_PRESET_KEY)
+    if (saved === 'all') return 'all_time'
+    if (
+      saved &&
+      ['all_time', 'this_month', 'last_3_months', 'last_6_months', 'this_year', 'custom'].includes(saved)
+    ) {
+      return saved as DatePreset
+    }
+  } catch {
+    // Non-fatal session storage access fallback
+  }
+  return fallback
+}
+
+export function setSessionDatePreset(preset: string): void {
+  if (typeof window === 'undefined' || !window.sessionStorage) return
+  try {
+    const normalized = preset === 'all' ? 'all_time' : preset
+    window.sessionStorage.setItem(SESSION_DATE_PRESET_KEY, normalized)
+  } catch {
+    // Non-fatal session storage access fallback
+  }
+}
+
+export function useDashboardFilters(initialPreset?: DatePreset) {
+  const resolvedPreset = initialPreset ?? getSessionDatePreset('all_time')
+  const initialDates = useMemo(() => computeDatesForPreset(resolvedPreset), [resolvedPreset])
+
+  const [datePreset, setDatePresetState] = useState<DatePreset>(resolvedPreset)
   const [startDate, setStartDate] = useState(initialDates.startDate)
   const [endDate, setEndDate] = useState(initialDates.endDate)
   const [landId, setLandId] = useState<string>('all')
@@ -49,6 +79,7 @@ export function useDashboardFilters(initialPreset: DatePreset = 'this_month') {
 
   const setDatePreset = useCallback((newPreset: DatePreset) => {
     setDatePresetState(newPreset)
+    setSessionDatePreset(newPreset)
     if (newPreset !== 'custom') {
       const dates = computeDatesForPreset(newPreset)
       setStartDate(dates.startDate)
@@ -58,13 +89,15 @@ export function useDashboardFilters(initialPreset: DatePreset = 'this_month') {
 
   const setCustomDates = useCallback((start: string, end: string) => {
     setDatePresetState('custom')
+    setSessionDatePreset('custom')
     setStartDate(start)
     setEndDate(end)
   }, [])
 
   const resetFilters = useCallback(() => {
-    const dates = computeDatesForPreset('this_month')
-    setDatePresetState('this_month')
+    const dates = computeDatesForPreset('all_time')
+    setDatePresetState('all_time')
+    setSessionDatePreset('all_time')
     setStartDate(dates.startDate)
     setEndDate(dates.endDate)
     setLandId('all')

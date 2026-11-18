@@ -2,7 +2,11 @@ import { describe, it } from 'node:test'
 import assert from 'node:assert'
 import { interpretWeatherCode } from '../src/services/weatherService.ts'
 import { computeDashboardAnalytics } from '../src/services/dashboardService.ts'
-import { computeDatesForPreset } from '../src/hooks/useDashboardFilters.ts'
+import {
+  computeDatesForPreset,
+  getSessionDatePreset,
+  setSessionDatePreset,
+} from '../src/hooks/useDashboardFilters.ts'
 import type {
   Transaction,
   FertilizerApplication,
@@ -58,6 +62,36 @@ describe('Dashboard Filter Presets', () => {
     const { startDate, endDate } = computeDatesForPreset('all_time')
     assert.strictEqual(startDate, '')
     assert.strictEqual(endDate, '')
+  })
+
+  it('defaults getSessionDatePreset to all_time when uninitialized', () => {
+    const preset = getSessionDatePreset()
+    assert.strictEqual(preset, 'all_time')
+  })
+
+  it('persists and normalizes session date preset in sessionStorage', () => {
+    const store = new Map<string, string>()
+    const origWindow = globalThis.window
+    // @ts-expect-error mock window.sessionStorage in Node test
+    globalThis.window = {
+      sessionStorage: {
+        getItem: (k: string) => store.get(k) ?? null,
+        setItem: (k: string, v: string) => store.set(k, v),
+      },
+    }
+
+    try {
+      assert.strictEqual(getSessionDatePreset(), 'all_time')
+      setSessionDatePreset('this_month')
+      assert.strictEqual(getSessionDatePreset(), 'this_month')
+      setSessionDatePreset('all') // normalizes 'all' -> 'all_time'
+      assert.strictEqual(getSessionDatePreset(), 'all_time')
+      setSessionDatePreset('custom')
+      assert.strictEqual(getSessionDatePreset(), 'custom')
+    } finally {
+      // @ts-expect-error restore window
+      globalThis.window = origWindow
+    }
   })
 })
 

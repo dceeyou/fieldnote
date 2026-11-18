@@ -36,7 +36,7 @@ import { getTodayColombo } from '../utils/date.ts'
 
 export function Reports() {
   const currentYear = getTodayColombo().slice(0, 4)
-  const [selectedYear, setSelectedYear] = useState(currentYear)
+  const [selectedYear, setSelectedYear] = useState('all')
   const [activeTab, setActiveTab] = useState<'monthly' | 'categories' | 'lands' | 'crops'>('monthly')
 
   const [transactions, setTransactions] = useState<Transaction[]>([])

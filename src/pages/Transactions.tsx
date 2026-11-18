@@ -56,6 +56,7 @@ import {
   formatDateDisplay,
 } from '../utils/date.ts'
 import { paginateItems } from '../utils/pagination.ts'
+import { getSessionDatePreset, setSessionDatePreset } from '../hooks/useDashboardFilters.ts'
 
 export function Transactions() {
   const [searchParams, setSearchParams] = useSearchParams()
@@ -78,9 +79,16 @@ export function Transactions() {
   const [landFilter, setLandFilter] = useState(initialLand)
   const [cropFilter, setCropFilter] = useState(initialCrop)
   const [categoryFilter, setCategoryFilter] = useState(initialCat)
-  const [datePreset, setDatePreset] = useState<'all' | 'this_month' | 'custom'>(
-    initialMonth ? 'custom' : 'this_month'
-  )
+  const sessionPreset = getSessionDatePreset('all_time')
+  const initialPreset: 'all' | 'this_month' | 'custom' = initialMonth
+    ? 'custom'
+    : sessionPreset === 'this_month'
+    ? 'this_month'
+    : sessionPreset === 'custom'
+    ? 'custom'
+    : 'all'
+
+  const [datePreset, setDatePresetState] = useState<'all' | 'this_month' | 'custom'>(initialPreset)
   const [startDate, setStartDate] = useState(() => {
     if (initialMonth) return `${initialMonth}-01`
     return `${getCurrentMonthColombo()}-01`
@@ -93,6 +101,11 @@ export function Transactions() {
     }
     return getTodayColombo()
   })
+
+  const setDatePreset = (preset: 'all' | 'this_month' | 'custom') => {
+    setDatePresetState(preset)
+    setSessionDatePreset(preset === 'all' ? 'all_time' : preset)
+  }
 
   // Modal State
   const [isModalOpen, setIsModalOpen] = useState(false)
@@ -734,8 +747,8 @@ export function Transactions() {
             <div className="inline-flex rounded-lg border border-border p-0.5 bg-subtle">
               {(
                 [
-                  { id: 'this_month', label: 'This Month' },
                   { id: 'all', label: 'All Time' },
+                  { id: 'this_month', label: 'This Month' },
                   { id: 'custom', label: 'Custom Range' },
                 ] as const
               ).map((preset) => (

@@ -81,7 +81,7 @@ export function Dashboard() {
     setLandId,
     setCropId,
     resetFilters,
-  } = useDashboardFilters('this_month')
+  } = useDashboardFilters()
 
   // Analytics & Data Hook
   const { analytics, loading, error, refresh, quickCompleteFertilizer } =
@@ -89,7 +89,7 @@ export function Dashboard() {
 
   // Filter Bar state
   const isFiltered =
-    datePreset !== 'this_month' || landId !== 'all' || cropId !== 'all'
+    datePreset !== 'all_time' || landId !== 'all' || cropId !== 'all'
 
   return (
     <div className="mx-auto max-w-7xl py-6 sm:py-8 space-y-8">
@@ -163,7 +163,7 @@ export function Dashboard() {
                 onClick={resetFilters}
                 className="flex items-center gap-1 text-xs font-medium text-forest-600 hover:text-forest-700 hover:underline transition-colors"
               >
-                <RotateCcw size={12} /> Reset to This Month
+                <RotateCcw size={12} /> Reset to All Time
               </button>
             )}
           </div>
@@ -177,11 +177,11 @@ export function Dashboard() {
               <div className="flex flex-wrap gap-1">
                 {(
                   [
+                    { key: 'all_time', label: 'All Time' },
                     { key: 'this_month', label: 'This Month' },
                     { key: 'last_3_months', label: 'Last 3M' },
                     { key: 'last_6_months', label: 'Last 6M' },
                     { key: 'this_year', label: 'This Year' },
-                    { key: 'all_time', label: 'All Time' },
                     { key: 'custom', label: 'Custom' },
                   ] as { key: DatePreset; label: string }[]
                 ).map(({ key, label }) => (
