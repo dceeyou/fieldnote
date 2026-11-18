@@ -10,6 +10,7 @@ import type {
   FertilizerApplication,
   SyncableTable,
   SyncDeletion,
+  SyncUpsert,
 } from '../data/db/schema.ts'
 
 export interface SyncResult {
@@ -50,6 +51,19 @@ export const DELETE_SYNC_ORDER: SyncableTable[] = [
   'crops',
   'lands',
 ]
+
+// Parent tables upserted before child tables to satisfy PostgreSQL FK constraints
+export const UPSERT_SYNC_ORDER: SyncableTable[] = [
+  'lands',
+  'crops',
+  'land_crops',
+  'categories',
+  'fertilizers',
+  'transactions',
+  'fertilizer_applications',
+]
+
+export const BATCH_SIZE = 50
 
 // Convert camelCase object to snake_case for Supabase
 export function toSnakeCase(obj: Record<string, unknown>): Record<string, unknown> {
@@ -143,6 +157,10 @@ function makeTombstoneKey(tableName: SyncableTable, recordId: string): string {
   return `${tableName}:${recordId}`
 }
 
+function makeOutboxKey(tableName: SyncableTable, recordId: string): string {
+  return `${tableName}:${recordId}`
+}
+
 export async function getPendingDeletionIds(tableName: SyncableTable): Promise<Set<string>> {
   try {
     const rows = await db.syncDeletions.where('tableName').equals(tableName).toArray()
@@ -152,8 +170,18 @@ export async function getPendingDeletionIds(tableName: SyncableTable): Promise<S
   }
 }
 
+export async function getPendingUpsertIds(tableName: SyncableTable): Promise<Set<string>> {
+  try {
+    const rows = await db.syncUpserts.where('tableName').equals(tableName).toArray()
+    return new Set(rows.map((r) => r.recordId))
+  } catch {
+    return new Set()
+  }
+}
+
 export async function recordSyncDeletions(tableName: SyncableTable, recordIds: string[]): Promise<void> {
   if (recordIds.length === 0) return
+  await clearSyncUpserts(tableName, recordIds)
   const now = new Date().toISOString()
   const entries: SyncDeletion[] = recordIds.map((recordId) => ({
     id: makeTombstoneKey(tableName, recordId),
@@ -177,9 +205,35 @@ export async function clearSyncDeletions(tableName: SyncableTable, recordIds: st
   }
 }
 
+export async function recordSyncUpserts(tableName: SyncableTable, recordIds: string[]): Promise<void> {
+  if (recordIds.length === 0) return
+  await clearSyncDeletions(tableName, recordIds)
+  const now = new Date().toISOString()
+  const entries: SyncUpsert[] = recordIds.map((recordId) => ({
+    id: makeOutboxKey(tableName, recordId),
+    tableName,
+    recordId,
+    queuedAt: now,
+  }))
+  try {
+    await db.syncUpserts.bulkPut(entries)
+  } catch (err) {
+    console.warn(`Failed to record local upsert outbox for ${tableName}:`, err)
+  }
+}
+
+export async function clearSyncUpserts(tableName: SyncableTable, recordIds: string[]): Promise<void> {
+  if (recordIds.length === 0) return
+  try {
+    await db.syncUpserts.bulkDelete(recordIds.map((id) => makeOutboxKey(tableName, id)))
+  } catch {
+    // Non-fatal cleanup error
+  }
+}
+
 /**
  * Best-effort immediate upsert of one or more records to Supabase.
- * Safe when offline: never throws to callers so local-first Dexie UX remains uninterrupted.
+ * Safe when offline: persists to Dexie syncUpserts outbox queue so changes are never lost.
  */
 export async function syncUpsertRecords(
   tableName: SyncableTable,
@@ -192,18 +246,24 @@ export async function syncUpsertRecords(
     .filter(Boolean)
   await clearSyncDeletions(tableName, ids)
 
-  if (!isSupabaseConfigured || !supabase) return false
+  if (!isSupabaseConfigured || !supabase) {
+    await recordSyncUpserts(tableName, ids)
+    return false
+  }
 
   try {
     const payload = records.map((r) => toSnakeCase(r))
     const { error } = await supabase.from(tableName).upsert(payload, { onConflict: 'id' })
     if (error) {
       console.warn(`Background Supabase upsert deferred for ${tableName}:`, error.message)
+      await recordSyncUpserts(tableName, ids)
       return false
     }
+    await clearSyncUpserts(tableName, ids)
     return true
   } catch (err) {
     console.warn(`Background Supabase upsert error for ${tableName}:`, err)
+    await recordSyncUpserts(tableName, ids)
     return false
   }
 }
@@ -225,6 +285,7 @@ export async function syncDeleteRecords(
 ): Promise<boolean> {
   if (recordIds.length === 0) return true
 
+  await clearSyncUpserts(tableName, recordIds)
   await recordSyncDeletions(tableName, recordIds)
 
   if (!isSupabaseConfigured || !supabase) return false
@@ -295,6 +356,140 @@ export async function flushPendingDeletions(): Promise<{ flushed: number; errors
   return { flushed, errors }
 }
 
+/**
+ * Uploads records in chunks of BATCH_SIZE (50) to Supabase.
+ * If a batch fails (e.g. FK constraint violation), falls back to per-record upsert
+ * so a single invalid record never prevents the remaining records from syncing.
+ */
+export async function uploadTableRecordsInBatches(
+  tableName: SyncableTable,
+  records: Record<string, unknown>[]
+): Promise<{ uploaded: number; failed: number }> {
+  if (records.length === 0) return { uploaded: 0, failed: 0 }
+  if (!isSupabaseConfigured || !supabase) {
+    throw new Error('Supabase is not configured.')
+  }
+
+  let uploaded = 0
+  let failed = 0
+
+  for (let i = 0; i < records.length; i += BATCH_SIZE) {
+    const chunk = records.slice(i, i + BATCH_SIZE)
+    const chunkPayload = chunk.map((r) => toSnakeCase(r))
+    const { error } = await supabase.from(tableName).upsert(chunkPayload, { onConflict: 'id' })
+
+    if (!error) {
+      uploaded += chunk.length
+      const ids = chunk.map((c) => String(c.id)).filter(Boolean)
+      await clearSyncUpserts(tableName, ids)
+    } else {
+      console.warn(`Batch upload failed for ${tableName}, attempting per-record fallback:`, error.message)
+      for (const item of chunk) {
+        const itemPayload = toSnakeCase(item)
+        const { error: itemError } = await supabase
+          .from(tableName)
+          .upsert(itemPayload, { onConflict: 'id' })
+        if (!itemError) {
+          uploaded += 1
+          if (item.id) {
+            await clearSyncUpserts(tableName, [String(item.id)])
+          }
+        } else {
+          failed += 1
+          console.warn(`Skipping invalid ${tableName} record ${item.id}:`, itemError.message)
+        }
+      }
+    }
+  }
+
+  if (uploaded === 0 && failed > 0) {
+    throw new Error(`Failed to upload ${tableName}: all ${failed} record(s) rejected by Supabase.`)
+  }
+
+  return { uploaded, failed }
+}
+
+/**
+ * Flushes all queued local upserts to Supabase in parent-before-child FK order.
+ */
+export async function flushPendingUpserts(): Promise<{ flushed: number; errors: string[] }> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { flushed: 0, errors: [] }
+  }
+
+  let allOutbox: SyncUpsert[] = []
+  try {
+    allOutbox = await db.syncUpserts.toArray()
+  } catch {
+    return { flushed: 0, errors: [] }
+  }
+
+  if (allOutbox.length === 0) {
+    return { flushed: 0, errors: [] }
+  }
+
+  const byTable = new Map<SyncableTable, string[]>()
+  for (const item of allOutbox) {
+    const list = byTable.get(item.tableName) || []
+    list.push(item.recordId)
+    byTable.set(item.tableName, list)
+  }
+
+  let flushed = 0
+  const errors: string[] = []
+
+  for (const tableName of UPSERT_SYNC_ORDER) {
+    const ids = byTable.get(tableName)
+    if (!ids || ids.length === 0) continue
+
+    let records: Record<string, unknown>[] = []
+    try {
+      switch (tableName) {
+        case 'lands':
+          records = (await db.lands.where('id').anyOf(ids).toArray()) as unknown as Record<string, unknown>[]
+          break
+        case 'crops':
+          records = (await db.crops.where('id').anyOf(ids).toArray()) as unknown as Record<string, unknown>[]
+          break
+        case 'land_crops':
+          records = (await db.landCrops.where('id').anyOf(ids).toArray()) as unknown as Record<string, unknown>[]
+          break
+        case 'categories':
+          records = (await db.categories.where('id').anyOf(ids).toArray()) as unknown as Record<string, unknown>[]
+          break
+        case 'fertilizers':
+          records = (await db.fertilizers.where('id').anyOf(ids).toArray()) as unknown as Record<string, unknown>[]
+          break
+        case 'transactions':
+          records = (await db.transactions.where('id').anyOf(ids).toArray()) as unknown as Record<string, unknown>[]
+          break
+        case 'fertilizer_applications':
+          records = (await db.fertilizerApplications.where('id').anyOf(ids).toArray()) as unknown as Record<string, unknown>[]
+          break
+      }
+    } catch (err) {
+      errors.push(`Failed to read ${tableName} for outbox flush: ${err instanceof Error ? err.message : String(err)}`)
+      continue
+    }
+
+    const foundIds = new Set(records.map((r) => String(r.id)))
+    const staleIds = ids.filter((id) => !foundIds.has(id))
+    if (staleIds.length > 0) {
+      await clearSyncUpserts(tableName, staleIds)
+    }
+
+    if (records.length > 0) {
+      const { uploaded, failed } = await uploadTableRecordsInBatches(tableName, records)
+      flushed += uploaded
+      if (failed > 0) {
+        errors.push(`${failed} record(s) failed in ${tableName}`)
+      }
+    }
+  }
+
+  return { flushed, errors }
+}
+
 export async function uploadLocalToSupabase(): Promise<SyncResult> {
   if (!isSupabaseConfigured || !supabase) {
     return { success: false, message: 'Supabase is not configured. Check your environment variables.' }
@@ -318,49 +513,36 @@ export async function uploadLocalToSupabase(): Promise<SyncResult> {
         db.fertilizerApplications.toArray(),
       ])
 
-    // 2. Upsert in parent-before-child FK order
+    // 2. Upsert in parent-before-child FK order using chunked batching with per-record fallback
     if (lands.length > 0) {
-      const payload = lands.map((l) => toSnakeCase(l as unknown as Record<string, unknown>))
-      const { error } = await supabase.from('lands').upsert(payload, { onConflict: 'id' })
-      if (error) throw new Error(`Failed to upload lands: ${error.message}`)
+      await uploadTableRecordsInBatches('lands', lands as unknown as Record<string, unknown>[])
     }
 
     if (crops.length > 0) {
-      const payload = crops.map((c) => toSnakeCase(c as unknown as Record<string, unknown>))
-      const { error } = await supabase.from('crops').upsert(payload, { onConflict: 'id' })
-      if (error) throw new Error(`Failed to upload crops: ${error.message}`)
+      await uploadTableRecordsInBatches('crops', crops as unknown as Record<string, unknown>[])
     }
 
     if (landCrops.length > 0) {
-      const payload = landCrops.map((lc) => toSnakeCase(lc as unknown as Record<string, unknown>))
-      const { error } = await supabase.from('land_crops').upsert(payload, { onConflict: 'id' })
-      if (error) throw new Error(`Failed to upload land crops: ${error.message}`)
+      await uploadTableRecordsInBatches('land_crops', landCrops as unknown as Record<string, unknown>[])
     }
 
     if (categories.length > 0) {
-      const payload = categories.map((cat) => toSnakeCase(cat as unknown as Record<string, unknown>))
-      const { error } = await supabase.from('categories').upsert(payload, { onConflict: 'id' })
-      if (error) throw new Error(`Failed to upload categories: ${error.message}`)
+      await uploadTableRecordsInBatches('categories', categories as unknown as Record<string, unknown>[])
     }
 
     if (fertilizers.length > 0) {
-      const payload = fertilizers.map((f) => toSnakeCase(f as unknown as Record<string, unknown>))
-      const { error } = await supabase.from('fertilizers').upsert(payload, { onConflict: 'id' })
-      if (error) throw new Error(`Failed to upload fertilizers: ${error.message}`)
+      await uploadTableRecordsInBatches('fertilizers', fertilizers as unknown as Record<string, unknown>[])
     }
 
     if (transactions.length > 0) {
-      const payload = transactions.map((t) => toSnakeCase(t as unknown as Record<string, unknown>))
-      const { error } = await supabase.from('transactions').upsert(payload, { onConflict: 'id' })
-      if (error) throw new Error(`Failed to upload transactions: ${error.message}`)
+      await uploadTableRecordsInBatches('transactions', transactions as unknown as Record<string, unknown>[])
     }
 
     if (applications.length > 0) {
-      const payload = applications.map((a) => toSnakeCase(a as unknown as Record<string, unknown>))
-      const { error } = await supabase
-        .from('fertilizer_applications')
-        .upsert(payload, { onConflict: 'id' })
-      if (error) throw new Error(`Failed to upload fertilizer schedules: ${error.message}`)
+      await uploadTableRecordsInBatches(
+        'fertilizer_applications',
+        applications as unknown as Record<string, unknown>[]
+      )
     }
 
     return {
@@ -513,6 +695,24 @@ export async function downloadSupabaseToLocal(): Promise<SyncResult> {
       }
     )
 
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(
+        new CustomEvent('agriflow:sync-complete', {
+          detail: {
+            source: 'download',
+            downloaded: {
+              lands: recLands.toPutLocal.length,
+              crops: recCrops.toPutLocal.length,
+              categories: recCategories.toPutLocal.length,
+              fertilizers: recFertilizers.toPutLocal.length,
+              transactions: recTransactions.toPutLocal.length,
+              fertilizerApplications: recApps.toPutLocal.length,
+            },
+          },
+        })
+      )
+    }
+
     return {
       success: true,
       message: 'Workspace data safely merged from Supabase (newer local edits preserved)!',
@@ -536,19 +736,40 @@ export async function downloadSupabaseToLocal(): Promise<SyncResult> {
 /**
  * Full bi-directional reconciliation:
  * 1. Flushes queued local deletions to Supabase
- * 2. Pulls and merges newer remote records into Dexie without overwriting newer local edits
- * 3. Pushes local-only or newer local records to Supabase
+ * 2. Flushes queued local outbox upserts to Supabase
+ * 3. Pulls and merges newer remote records into Dexie without overwriting newer local edits
+ * 4. Pushes local-only or newer local records to Supabase
  */
 export async function syncWorkspace(): Promise<SyncResult> {
   if (!isSupabaseConfigured || !supabase) {
     return { success: false, message: 'Supabase is not configured.' }
   }
 
+  // 1. Flush any pending deletions first
+  await flushPendingDeletions()
+
+  // 2. Flush any pending outbox upserts
+  await flushPendingUpserts()
+
+  // 3. Download newer remote records into local store
   const down = await downloadSupabaseToLocal()
   if (!down.success) return down
 
+  // 4. Upload local-only or updated local records
   const up = await uploadLocalToSupabase()
   if (!up.success) return up
+
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(
+      new CustomEvent('agriflow:sync-complete', {
+        detail: {
+          source: 'workspace',
+          uploaded: up.uploadedCounts,
+          downloaded: down.downloadedCounts,
+        },
+      })
+    )
+  }
 
   return {
     success: true,

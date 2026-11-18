@@ -46,3 +46,11 @@ export interface SyncDeletion {
   recordId: string
   deletedAt: string
 }
+
+export interface SyncUpsert {
+  id: string
+  tableName: SyncableTable
+  recordId: string
+  queuedAt: string
+}
+

@@ -64,6 +64,16 @@ export function useDashboardAnalytics(filters: DashboardFilters) {
     loadData()
   }, [loadData])
 
+  useEffect(() => {
+    const handleSyncComplete = () => {
+      loadData()
+    }
+    window.addEventListener('agriflow:sync-complete', handleSyncComplete)
+    return () => {
+      window.removeEventListener('agriflow:sync-complete', handleSyncComplete)
+    }
+  }, [loadData])
+
   const analytics: DashboardAnalyticsData = useMemo(() => {
     return computeDashboardAnalytics(
       transactions,

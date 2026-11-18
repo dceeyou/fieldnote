@@ -12,6 +12,7 @@ import { buildExcelWorkbook, type ExportPayload } from '../src/services/exportSe
 import {
   reconcileRecords,
   DELETE_SYNC_ORDER,
+  UPSERT_SYNC_ORDER,
 } from '../src/services/syncService.ts'
 import {
   ALL_DEFAULT_CATEGORIES,
@@ -260,6 +261,14 @@ describe('Integration Workflow: Offline-to-Online Sync Regression (STB-01)', () 
         DELETE_SYNC_ORDER.indexOf('fertilizers')
     )
     assert.ok(DELETE_SYNC_ORDER.indexOf('land_crops') < DELETE_SYNC_ORDER.indexOf('crops'))
+
+    // FK upsert order: parent tables must precede child tables
+    assert.ok(UPSERT_SYNC_ORDER.indexOf('lands') < UPSERT_SYNC_ORDER.indexOf('transactions'))
+    assert.ok(UPSERT_SYNC_ORDER.indexOf('categories') < UPSERT_SYNC_ORDER.indexOf('transactions'))
+    assert.ok(
+      UPSERT_SYNC_ORDER.indexOf('fertilizers') <
+        UPSERT_SYNC_ORDER.indexOf('fertilizer_applications')
+    )
   })
 })
 

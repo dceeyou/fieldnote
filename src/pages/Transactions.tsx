@@ -191,6 +191,17 @@ export function Transactions() {
     loadTransactions()
   }, [search, typeFilter, landFilter, cropFilter, categoryFilter, datePreset, startDate, endDate])
 
+  useEffect(() => {
+    const handleSyncComplete = () => {
+      loadMetadata()
+      loadTransactions()
+    }
+    window.addEventListener('agriflow:sync-complete', handleSyncComplete)
+    return () => {
+      window.removeEventListener('agriflow:sync-complete', handleSyncComplete)
+    }
+  }, [search, typeFilter, landFilter, cropFilter, categoryFilter, datePreset, startDate, endDate])
+
   const summary = useMemo(() => calculateFinancialSummary(transactions), [transactions])
 
   const paginated = useMemo(

@@ -5,6 +5,8 @@ import {
   toSnakeCase,
   toCamelCase,
   DELETE_SYNC_ORDER,
+  UPSERT_SYNC_ORDER,
+  BATCH_SIZE,
 } from '../src/services/syncService.ts'
 import { diffLandCropAssociations } from '../src/services/landService.ts'
 import type { LandCrop } from '../src/data/db/schema.ts'
@@ -87,6 +89,25 @@ describe('Unified Dexie ↔ Supabase Sync Reconciliation (STB-01)', () => {
     assert.ok(idxApp < idxLands && idxApp < idxCrops && idxApp < idxFerts)
     assert.ok(idxTx < idxLands && idxTx < idxCrops && idxTx < idxCats)
     assert.ok(idxLandCrops < idxLands && idxLandCrops < idxCrops)
+  })
+
+  it('upserts parent tables before child tables to satisfy PostgreSQL FK constraints', () => {
+    const idxLands = UPSERT_SYNC_ORDER.indexOf('lands')
+    const idxCrops = UPSERT_SYNC_ORDER.indexOf('crops')
+    const idxCats = UPSERT_SYNC_ORDER.indexOf('categories')
+    const idxFerts = UPSERT_SYNC_ORDER.indexOf('fertilizers')
+    const idxLandCrops = UPSERT_SYNC_ORDER.indexOf('land_crops')
+    const idxTx = UPSERT_SYNC_ORDER.indexOf('transactions')
+    const idxApp = UPSERT_SYNC_ORDER.indexOf('fertilizer_applications')
+
+    assert.ok(idxLands < idxLandCrops)
+    assert.ok(idxCrops < idxLandCrops)
+    assert.ok(idxLands < idxTx && idxCats < idxTx)
+    assert.ok(idxLands < idxApp && idxCrops < idxApp && idxFerts < idxApp)
+  })
+
+  it('configures BATCH_SIZE to 50 for resilient chunked network payload transmission', () => {
+    assert.equal(BATCH_SIZE, 50)
   })
 })
 

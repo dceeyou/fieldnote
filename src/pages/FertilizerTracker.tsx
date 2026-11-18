@@ -131,6 +131,17 @@ export function FertilizerTracker() {
     loadApplications()
   }, [landFilter, cropFilter])
 
+  useEffect(() => {
+    const handleSyncComplete = () => {
+      loadMetadata()
+      loadApplications()
+    }
+    window.addEventListener('agriflow:sync-complete', handleSyncComplete)
+    return () => {
+      window.removeEventListener('agriflow:sync-complete', handleSyncComplete)
+    }
+  }, [landFilter, cropFilter])
+
   // Count reminder metrics for active scheduled applications
   const counts = useMemo(() => {
     let overdue = 0
